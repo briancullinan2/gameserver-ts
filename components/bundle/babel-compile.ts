@@ -108,7 +108,8 @@ export function collectDependencies(rawCode: string, baseRoute: string, dependen
 		CallExpression(babelPath: NodePath<tType.CallExpression>)
 		{
 			if(
-				(babelPath.node.callee as any).name === 'require' &&
+				((babelPath.node.callee as any).name === 'require'
+					|| (babelPath.node.callee as any).name === 'import') &&
 				babelPath.node.arguments.length === 1 &&
 				babelPath.node.arguments[0].type === 'StringLiteral'
 			)
