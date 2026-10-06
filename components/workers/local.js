@@ -7,7 +7,7 @@ const localSelf = /** @type {any} */ (self);
 
 
 const DB_VERSION = 1; // Increment this when you add new C# Entities!
-const DB_NAME = "briancullinan2/mediaserver-ts";
+const DB_NAME = "briancullinan2/gameserver-ts";
 localSelf.DB_NAME = DB_NAME;
 const DB_STORE_NAME = 'FILE_DATA';
 localSelf.DB_STORE_NAME = DB_STORE_NAME;
@@ -223,7 +223,7 @@ async function putRecordInternal(storeName, record, dbName = null)
 	const newerContents = localSelf.FS?.virtual[filePath]?.contents
 		|| localSelf.FS?.virtual[record.path]?.contents;
 
-	if(localSelf.FS.virtual[filePath]?.timestamp
+	if(localSelf.FS?.virtual[filePath]?.timestamp
 		&& record.timestamp
 		&& localSelf.FS.virtual[filePath]?.timestamp > record.timestamp)
 	{

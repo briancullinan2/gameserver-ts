@@ -56,164 +56,156 @@ export const MODULE_REGISTRY: Record<string, ComponentRoute> = {
 		subtext: 'Requires Lumino DockPanel container references and UI state layout persistence.',
 		description: 'Collapses active sidebars or secondary workspace panels to maximize primary viewing space across media and storage widgets.'
 	},
-	'searchlist': {
-		label: 'Search Files',
-		url: './components/filelist/widget-search.ts',
-		className: 'SearchListWidget',
-		iconClass: 'bx bx-search',
-		subtext: 'Depends on indexed search database endpoints, debounced input triggers, and query-parsing regex modules.',
-		description: 'An indexed filesystem search interface that queries local and remote metadata to rapidly retrieve shared media files, audio tracks, and archives.'
-	},
-	'fileview': {
-		label: 'Shared Files',
-		url: './components/fileview/widget.ts',
-		className: 'FileviewWidget',
-		iconClass: 'bx bx-folder-code',
-		subtext: 'Requires SOCKS5/WebSocket stream proxies, local directory access APIs, and virtualized tree rendering contexts.',
-		description: 'A browser-based remote filesystem explorer enabling secure browsing, directory sharing, and file operations across distributed network storage nodes.'
-	},
-	'music': {
-		label: 'Music',
-		url: './components/music/widget.ts',
-		className: 'MusicWidget',
-		iconClass: 'bx bx-music',
-		subtext: 'Depends on Web Audio API, dynamic audio element binding, visualizer engine hooks, and crossfade timing managers.',
-		description: 'A high-performance audio engine and playlist player supporting seamless track crossfading, audio visualization, and stream playback from remote storage.'
-	},
-	'photos': {
-		label: 'Photos',
-		url: './components/photo/widget.ts',
-		className: 'PhotoWidget',
-		iconClass: 'bx bx-camera-alt',
-		subtext: 'Requires HTML5 Image canvas decoders, EXIF metadata extraction modules, and client-side thumbnail caching stores.',
-		description: 'A photo collection browser equipped with EXIF inspection, high-resolution previewing, and slideshow controls for indexed photographic libraries.'
-	},
-	'images': {
-		label: 'Images',
-		url: './components/image/widget.ts',
-		className: 'ImageWidget',
-		iconClass: 'bx bx-image',
-		subtext: 'Operates via CSS carousel drivers, pan/zoom canvas handlers, and multi-format raster/vector image readers.',
-		description: 'A interactive image viewer supporting multi-directional carousel transitions, responsive image sliders, and deep-zoom inspection for remote asset stores.'
-	},
-	'videos': {
-		label: 'Videos',
-		url: './components/video/widget.ts',
-		className: 'VideoWidget',
-		iconClass: 'bx bx-video',
-		subtext: 'Depends on HTML5 Video API, Media Source Extensions (MSE), and WebSocket telemetry streams for adaptive playback.',
-		description: 'A versatile video streaming player capable of handling short clips, web-shared recordings, and adaptive stream sources with custom playback controls.'
-	},
-	'movies': {
-		label: 'Movies',
-		url: './components/movie/widget.ts',
-		className: 'MovieWidget',
-		iconClass: 'bx bx-movie',
-		subtext: 'Integrates with TMDB/IMDb scrapers, server-side FFmpeg transcode queues, and HTTP Range request handlers.',
-		description: 'A cinematic media library interface featuring automated metadata matching, real-time transcoding streams, and full movie playback controls.'
-	},
 	'games': {
-		label: 'Games',
-		url: './components/game/widget.ts',
-		className: 'GameWidget',
+		label: 'Games Library',
+		url: './components/games/widget.ts',
+		className: 'GamesWidget',
 		iconClass: 'bx bx-joystick',
-		subtext: 'Requires WebAssembly (WASM) emulator runtimes, WebGL render target canvases, and Gamepad API event listeners.',
-		description: 'An embedded web execution environment and browser-based emulator dashboard for launching, streaming, and interacting with remote game assets.'
+		subtext: 'Relies on automatic ROM/executable detection, cover art scraping services, and seamless sidebar Virtual FS file tree-to-emulator context switching.',
+		description: 'A fullscreen grid and cover art browser paired with a virtual file explorer to launch ROMs and games instantly into active engine viewports.'
 	},
-
-	// 'database': {
-	//   label: 'Local Database',
-	//   url: './components/filelist/widget-database.ts',
-	//   className: 'DatabaseListWidget',
-	//   iconClass: 'bx bx-database',
-	//   subtext: 'Requires IndexedDB storage adapters, local SQLite WASM bindings, and automated schema migration scripts.',
-	//   description: 'A client-side persistent storage inspector for tracking local file indices, media caches, and offline synchronization states.'
-	// },
+	'worlds': {
+		label: 'World Explorer',
+		url: './components/worlds/widget.ts',
+		className: 'WorldsWidget',
+		iconClass: 'bx bx-globe-alt',
+		subtext: 'Interfaces with game-specific cheat/API adapters, BSP/map header parsers, level skip hooks, and spawn location coordinates.',
+		description: 'Instantly jump into any game environment, skip to specific story missions, select custom spawn points, or load level maps directly into the engine.'
+	},
+	'players': {
+		label: 'Player Roster',
+		url: './components/players/widget.ts',
+		className: 'PlayersWidget',
+		iconClass: 'bx bx-community',
+		subtext: 'Requires WebSockets/SOCKS5 session tracking, stat aggregation APIs, character skin filters, and user inventory state synchronization.',
+		description: 'A unified roster and player hub displaying active server players, character skins, historical stats, and public inventory items.'
+	},
+	'assets': {
+		label: 'Asset Library',
+		url: './components/assets/widget.ts',
+		className: 'AssetsWidget',
+		iconClass: 'bx bx-cube-inside',
+		subtext: 'Driven by 3D Coverflow canvas renderers, WebGL shader hot-reloading streams, and live texture/model file watchers.',
+		description: 'An interactive 3D Coverflow showcase for game assets, shaders, skins, and textures with support for real-time asset painting and live in-game previewing.'
+	},
+	'tasks': {
+		label: 'Server Tasks',
+		url: './components/tasks/widget.ts',
+		className: 'TasksWidget',
+		iconClass: 'bx bx-server',
+		subtext: 'Utilizes high-resolution performance timing instrumentation (performance.now wrappers) and worker messaging IPC to estimate execution load.',
+		description: 'A process and task monitor displaying live CPU usage, background worker execution, proxy relays, and server-side task queues in a unified view.'
+	},
+	'rcon': {
+		label: 'RCON Console',
+		url: './components/rcon/widget.ts',
+		className: 'RconWidget',
+		iconClass: 'bx bx-terminal', // or 'bx bx-broadcast' / 'bx bx-command'
+		subtext: 'Interfaces with UDP/TCP RCON packet protocols, challenge-response auth handlers, cvar autocomplete caches, and live log stream parsers.',
+		description: 'A direct game server remote administration tool for executing console commands, managing server cvars in real time, kicking/banning players, and broadcasting server messages.'
+	},
 	'tools': {
-		label: 'Tools',
+		label: 'More Tools',
 		url: './components/tools/widget.ts',
 		className: 'ToolsWidget',
-		iconClass: 'bx bx-rename',
-		subtext: 'Relies on system subprocess execution bridges, batch processing queues, and external automation service RPCs.',
-		description: 'A centralized utility hub housing torrent procurement engines, transcode queue monitors, file renamers, and automated background media tools.'
+		iconClass: 'bx bx-spanner',
+		subtext: 'Integrates PK3/ZIP extraction pipelines, package resolution managers, SOCKS5/UDP proxy tunnels, and WASM/Emscripten runners.',
+		description: 'A multi-tool drawer housing automated asset mirrors, package managers, proxy tunnel configurations, and engine diagnostic utilities.'
 	},
-	// 'settings': {
-	//   label: 'Edit Settings',
-	//   url: './components/editor/widget-settings.ts',
-	//   className: 'SettingsWidget',
-	//   iconClass: 'bx bx-gear',
-	//   subtext: 'Depends on local storage key-value stores, JSON configuration schemas, and live application theme managers.',
-	//   description: 'A application configuration panel for managing transcode presets, remote network bindings, storage paths, and UI preferences.'
-	// },
 };
 
 
 menuSelf.MODULE_REGISTRY = MODULE_REGISTRY;
 
 export const TOOLS_REGISTRY: Record<string, ComponentRoute> = {
-	'torrent': {
-		label: 'Torrents',
-		url: './components/tools/widget-torrent.ts',
-		className: 'TorrentWidget',
-		iconClass: 'bx bx-archive-arrow-down',
-		subtext: 'Requires WebTorrent / libtorrent Node native binding, DHT/P2P Socket layer, active TCP/UDP ports 6881-6889, and Local Storage session persistence.',
-		description: 'An automated peer-to-peer file acquisition system designed to coordinate high-speed swarm downloads, parse magnet URIs, verify piece integrity, and orchestrate torrent lifecycle management.'
-	},
-	'nzb': {
-		label: 'NZB & Usenet',
-		url: './components/tools/widget-nzb.ts',
-		className: 'NzbWidget',
-		iconClass: 'bx bx-news',
-		subtext: 'Depends on TLS/SSL NNTP socket transport, SABnzbd or NZBGet RPC endpoints, PAR2 repair utilities, and multi-part RAR decoding libraries.',
-		description: 'A multi-threaded Usenet client manager capable of parsing XML-based NZB index files, assembling split binary segments across high-bandwidth NNTP connections, and running automated file repairs.'
-	},
 	'ripper': {
-		label: 'Movie Finder',
-		url: './components/tools/widget-movies.ts',
-		className: 'MoviesWidget',
-		iconClass: 'bx bx-film',
-		subtext: 'Integrates with TMDB / IMDb REST APIs, Radarr API v3, OMDb metadata scrapers, and fuzzy string-matching regex modules.',
-		description: 'An intelligent cinematic media crawler that queries indexers for releases, analyzes metadata profiles against media quality rules, and automatically matches releases with high-accuracy IMDB metadata.'
+		label: 'Games Finder',
+		url: './components/tools/widget-games.ts',
+		className: 'GamesWidget',
+		iconClass: 'bx bx-cloud',
+		subtext: 'Interfaces with SOCKS5/HTTP client proxies, bookmarking engines, web search scrapers, and URL metadata extraction pipelines.',
+		description: 'An in-browser content crawler and link discoverer that queries external game sites via proxy tunnels to index, bookmark, and import remote game files and web links.'
 	},
-	'tv': {
-		label: 'TV Subscriptions',
-		url: './components/tools/widget-tv.ts',
-		className: 'TvWidget',
-		iconClass: 'bx bx-tv',
-		subtext: 'Relies on TVDB API v4, Sonarr GraphQL/REST interfaces, MyEpisodes RSS feed authentication, and cron scheduling daemons.',
-		description: 'A comprehensive episodic television management engine that tracks release schedules, orchestrates series monitoring, and synchronizes watch history across third-party tracking portals.'
+	'slicer': {
+		label: 'Map Slicer',
+		url: './components/tools/widget-slicer.ts',
+		className: 'SlicerWidget',
+		iconClass: 'bx bx-mesh',
+		subtext: 'Requires BSP/MAP spatial mesh parsers, bounding-box geometry extractors, room marker anchors, and WebGL mesh slice renderers.',
+		description: 'A 3D level geometry extraction tool that isolates room markers, slices BSP map sectors, and exports modular environment meshes from supported game engines.'
 	},
-	'renamer': {
-		label: 'Batch Renamer',
-		url: './components/tools/widget-renamer.ts',
-		className: 'RenamerWidget',
-		iconClass: 'bx bx-rename',
-		subtext: 'Uses Node.js `fs-extra` module, cross-platform POSIX path utilities, custom template engine parsing, and dry-run diffing pipelines.',
-		description: 'A structural batch file organization tool that parses raw filenames into normalized naming schemas, handles multi-directory relocation, and executes instant filesystem renames.'
+	'packages': {
+		label: 'Package Manager',
+		url: './components/packages/widget.ts',
+		className: 'PackagesWidget',
+		iconClass: 'bx bx-archive-arrow-down',
+		subtext: 'Depends on cross-platform engine toolchains, WASM/Emscripten compilation workers, QEdit browser integrations, and runtime binary targets.',
+		description: 'A centralized engine suite manager for downloading, building, and deploying platform-specific game runtimes, WASM builds, and embedded browser editors.'
 	},
-	'tagger': {
-		label: 'ID3 Tag Editor',
-		url: './components/tools/widget-tagger.ts',
-		className: 'TaggerWidget',
-		iconClass: 'bx bx-price-tag-alt',
-		subtext: 'Requires `node-id3`, `music-metadata` parser engine, FFmpeg audio probe bindings, and embedded cover art buffer readers.',
-		description: 'An advanced audio metadata editor built to inspect, extract, and write ID3v2 tags, embedded album artwork, variable bitrate headers, and canonical track metadata directly into audio streams.'
+	'sync': {
+		label: 'Sync Saves',
+		url: './components/sync/widget.ts',
+		className: 'SyncWidget',
+		iconClass: 'bx bx-refresh-cw-alt',
+		subtext: 'Utilizes WebSocket relay tunnels, SOCKS5 proxy NAT traversal, IndexedDB delta caching, and browser tab-to-tab peer state channels.',
+		description: 'A real-time directory and save-state synchronization engine that bridges shared folders and save files across multiple browser tabs and remote proxy instances.'
 	},
-	'status': {
-		label: 'Transcoder Queue',
-		url: './components/status/widget.ts',
-		className: 'WorkerStatusWidget',
-		iconClass: 'bx bx-cog',
-		subtext: 'Operates via BullMQ / Redis message broker, WebWorker thread pool poolers, FFmpeg CLI subprocess runners, and WebSocket telemetry status frames.',
-		description: 'A dynamic background task monitor that provides real-time oversight for hardware-accelerated video transcoding, worker health metrics, queue priority distribution, and stream encoding pipelines.'
+	'proxy': {
+		label: 'Proxy Status',
+		url: './components/proxy/widget.ts',
+		className: 'ProxyWidget',
+		iconClass: 'bx bx-radar',
+		subtext: 'Monitors WebSocket/UDP bridge health, latency pulse telemetry, tunnel handshake protocols, and configuration setup routines.',
+		description: 'A system diagnostic dashboard providing live network proxy status, active tunnel latency metrics, connection logs, and client setup instructions.'
 	},
-	'github': {
-		label: 'Github Commit',
-		url: './components/filelist/widget-github.ts',
-		className: 'GithubListWidget',
-		iconClass: 'bx bx-git-repo-forked',
-		subtext: 'Requires GitHub REST/GraphQL API tokens, simple-git subprocess wrapper, SSH key agent credentials, and git-log JSON parsers.',
-		description: 'A repository history and version control dashboard that tracks commit trees, diff histories, remote pull requests, and automated sync events across local and remote repositories.'
+	'shaders': {
+		label: 'Shader Analyzer',
+		url: './components/shaders/widget.ts',
+		className: 'ShadersWidget',
+		iconClass: 'bx bx-palette',
+		subtext: 'Powered by GLSL/HLSL syntax parsers, ShaderToy sandbox bridges, live uniform parameter controls, and WebGL context previewers.',
+		description: 'An interactive shader inspection and playground engine for previewing GLSL material scripts, testing texture passes, and inspecting real-time visual effects.'
+	},
+
+	'fileview': {
+		label: 'File Explorer',
+		url: './components/fileview/widget.ts',
+		className: 'FileviewWidget',
+		iconClass: 'bx bx-folder',
+		subtext: 'Powered by virtualized DOM grid views, MIME type decoders, canvas thumbnail generators, and remote Virtual FS directory stream bridges.',
+		description: 'An interactive, media-rich file system explorer for browsing, previewing, and organizing local, remote, and archived assets across unified storage backends.'
+	},
+	'logs': {
+		label: 'Log Streamer',
+		url: './components/logs/widget.ts',
+		className: 'LogsWidget',
+		iconClass: 'bx bx-code-alt',
+		subtext: 'Interfaces with Linux systemd `journalctl` daemons, game engine log tails (`qconsole.log`), regex filter pipelines, and streaming WebSocket listeners.',
+		description: 'A real-time log aggregator and historical console viewer that tails game server outputs, tracks player event histories, and monitors engine system diagnostics.'
+	},
+	'configure': {
+		label: 'Game Configurator',
+		url: './components/games/widget-configure.ts',
+		className: 'ConfigureWidget',
+		iconClass: 'bx bx-slider-alt',
+		subtext: 'Integrates with Ace Editor, cfg script parsers, keybinding visualizers, and pre-built admin template injection engines.',
+		description: 'A visual configuration editor and scripting hub with Ace Editor integration to easily tweak game server variables (`cvars`), keybindings, and admin scripts.'
+	},
+	'analysis': {
+		label: 'Content Validator',
+		url: './components/analysis/widget-validate.ts',
+		className: 'ValidateWidget',
+		iconClass: 'bx bx-check-shield',
+		subtext: 'Runs multi-file archive integrity checkers, dependency chain solvers, sound/texture replacement detectors, and map package validators.',
+		description: 'A diagnostic content auditing tool that verifies game asset dependencies, detects broken sound/texture references, and validates multi-part level downloads.'
+	},
+	'meta': {
+		label: 'Metadata Editor',
+		url: './components/meta/widget.ts',
+		className: 'MetaWidget',
+		iconClass: 'bx bx-edit-alt',
+		subtext: 'Operates on map entity lump parsers, lighting map adjusters, server name manifests, and in-place binary asset patchers.',
+		description: 'A dedicated asset and level patcher for editing BSP entities, fixing missing or overlapping map textures, adjusting lighting parameters, and configuring remote server names.'
 	},
 	'terminal-container': {
 		label: 'Show Console',
@@ -230,7 +222,7 @@ export const TOOLS_REGISTRY: Record<string, ComponentRoute> = {
 		iconClass: 'bx bx-chart-stacked-rows',
 		subtext: 'Built on Canvas2D / WebGL rendering context, LightGraph.js node engine, DAG execution pipelines, and JSON graph serialization formats.',
 		description: 'A visual node-based execution canvas for orchestrating media pipelines, connecting step-by-step automation workflows, and visually inspecting event-driven data flow branches.'
-	}
+	},
 };
 
 

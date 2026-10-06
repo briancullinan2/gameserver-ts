@@ -164,7 +164,7 @@ const HELP_MENU: MenuConfig = {
 		iconClass: "bx bx-keyboard"
 	}, {
 		name: "Report Issues",
-		href: "https://github.com/briancullinan2/mediaserver-ts/issues",
+		href: "https://github.com/briancullinan2/gameserver-ts/issues",
 		iconClass: "bx bx-bug"
 	}, {
 		divider: true

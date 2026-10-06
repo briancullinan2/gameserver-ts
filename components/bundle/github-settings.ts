@@ -296,7 +296,7 @@ const LOCAL_SETTINGS: Record<string, Record<string, SettingConfig>> = {
 		},
 		environmentRepository: {
 			key: 'environment_repository',
-			default: 'briancullinan2/mediaserver-ts',
+			default: 'briancullinan2/gameserver-ts',
 			description: 'Repository for this workspace, the entire IDE, code editor and engine runner, for editing the environment inside the workspace.',
 			set: configureRepository
 		},

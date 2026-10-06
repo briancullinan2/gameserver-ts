@@ -19,7 +19,7 @@ const workerSelf: FileSystemWindow & LuminoLayoutWindow = self as unknown as any
 export class ServiceWorkerManager
 {
 	private readonly defaultOwner = 'briancullinan2';
-	private readonly defaultRepo = 'mediaserver-ts';
+	private readonly defaultRepo = 'gameserver-ts';
 	private readonly defaultBranch = 'main';
 	private readonly settingsFilePath = '/base/settings.json';
 

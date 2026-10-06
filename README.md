@@ -1,199 +1,88 @@
-Here is a architectural breakdown and complete, modern `README.md` for migrating the **`briancullinan2/mediaserver`** project from its original PHP/Ampache server-centric architecture to a modern, browser-native JavaScript/TypeScript client-side media server.
+# Game Server
+
+## Section 1: Foundation Analysis
+
+### Component 1: `elastic-game-server` Analysis
+
+The core intent behind **`elastic-game-server`** is dynamic scale-on-demand backend infrastructure tailored specifically for low-latency multiplayer gaming.
+
+* **On-Demand Lifecycle:** Automatically spins up dedicated game server instances (containers/micro-VMs) based on player demand queue and shuts them down when idle.
+* **Session Routing:** Acts as an orchestration broker that pairs clients with nearest low-latency instances.
+* **State Persistence:** Abstracted state tracking ensuring seamless player handoffs, reconnects, and ephemeral session isolation.
 
 ---
 
-### Architectural Transformation Summary
+### Component 2: `quake3-proxy-server` Analysis
 
-| Feature | Legacy PHP Architecture | New Browser-Native JavaScript Architecture |
-| --- | --- | --- |
-| **Runtime & Server** | PHP 7+ Front Controller (`index.php`), Apache/Nginx, SQLite/MySQL | Pure Client-Side SPA (TypeScript/HTML5), Service Workers, Web Workers |
-| **Database & Indexing** | Server-side relational DB via `includes/db.inc` | **OPFS SQLite WASM** via `@sqlite.org/sqlite-wasm` or **IndexedDB** |
-| **Transcoding & Media** | Server FFmpeg / VLC execution via `encode.module` | **FFmpeg.wasm** inside dedicated **Web Workers** for client-side encoding |
-| **File Access & Storage** | Server-side directory crawling (`files.module`, `cron.php`) | **File System Access API** (`window.showDirectoryPicker()`) with OPFS persistence |
-| **Torrents & Downloader** | Server-side downloading (`download.module`) | **WebTorrent** in browser using WebSockets/SOCKS5 proxy signaling |
-| **P2P & Local Sharing** | WebDAV / Ampache API endpoints | **WebRTC DataChannels** for direct P2P mesh browser-to-browser streaming |
+The core intent behind **`quake3-proxy-server`** is protocol bridging, traffic proxying, and browser compatibility translation for native retro gaming engines.
+
+* **WebSocket/UDP Bridge:** Translates standard browser transport (WebSockets/WebRTC) into raw binary UDP packets required by legacy engines (like ioquake3).
+* **Protocol Interception & Inspection:** Sits transparently between client and server, enabling real-time network manipulation, state relaying, and client spoofing.
+* **Emscripten / WASM Integration:** Allows web-compiled engines running in client browsers to communicate with standard multiplayer backends without modifying core engine binary protocol logic.
 
 ---
 
-# Modern MediaServer JS
+## Section 2: Combined Unified Architecture ("GeForce Now in Offscreen GPUs")
 
-> A 100% client-side, zero-backend media server, stream engine, and P2P distribution network running entirely inside the web browser.
+The synthesized vision combines **elastic server provisioning**, **WASM-protocol proxying**, and **remote GPU stream rendering** into a browser-first arcade network.
 
-`mediaserver-js` re-imagines the classic monolithic PHP `Atlas/mediaserver` platform as a high-performance, browser-native web application. Utilizing modern Web APIs (WebAssembly, Web Workers, File System Access API, OPFS, WebRTC, and WebSockets), this project indexes local file systems, transcodes media client-side, streams via BitTorrent/WebRTC, and shares files across browsers—without sending media content through a centralized server.
-
----
-
-## Key Features
-
-- 📁 **Local Directory Mounts & Indexing**: Mount local directories directly via the File System Access API. File metadata and media trees are persisted using SQLite compiled to WebAssembly inside Origin Private File System (OPFS).
-- ⚙️ **Client-Side Transcoding (Web Workers)**: Transcode video and audio formats (MKV, AVI, FLAC, AC3) directly in background Web Workers using `@ffmpeg/ffmpeg` (FFmpeg.wasm).
-- 🌐 **BitTorrent over WebSockets**: Connect to the BitTorrent network using client-side WebTorrent routed through WebSocket trackers or custom SOCKS5 proxy adapters.
-- 🔄 **Browser-to-Browser P2P Mesh**: Stream local media directly to other client browser tabs using WebRTC DataChannels for zero-latency local network or remote sharing.
-- ⚡ **Offline-First PWA**: Service Workers cache UI assets, database interfaces, and stream parsers for full offline usage.
+Instead of client devices executing heavy WebGL/WASM workloads or downloading large asset packs locally, headful headless instances run inside offscreen virtualized host GPUs across distributed edge nodes. Verified game instances stream directly to any standard browser context via low-latency WebRTC streams.
 
 ---
 
-## Architecture Overview
-
+### System Architecture Breakdown
 
 ```
-
-```
-                  +-------------------------------------------------------+
-                  |                   Browser Tab (UI)                    |
-                  |  - React/Lit UI Component Tree                        |
-                  |  - HTML5 Video / WebAudio Render Pipeline             |
-                  +-----------+----------------------+--------------------+
-                              |                      |
-        +---------------------+                      +----------------------+
-        |                                                                   |
-        v                                                                   v
-
-```
-
-+-----------------------+                                              +-----------------+
-|   Main Web Worker     |                                              |   Web Worker    |
-| (Database & Engine)   |                                              |  (Transcoder)   |
-|                       |                                              |                 |
-|  - SQLite WASM (OPFS) |                                              |  - FFmpeg.wasm  |
-|  - Metadata Indexer   |                                              |  - Demuxer      |
-|  - Router & API       |                                              |  - Chunk Pipeline
-+-----------+-----------+                                              +-----------------+
-|
-+-----------------------+-----------------------+
-|                       |                       |
-v                       v                       v
-+----------------------+  +-------------------+  +--------------------+
-| File System Access   |  |   WebTorrent /    |  |   WebRTC Peer      |
-|     API / OPFS       |  | WebSocket Proxy   |  |   DataChannels     |
-| (Local Disks & Repos)|  | (BitTorrent Swarm)|  | (Local/Remote P2P) |
-+----------------------+  +-------------------+  +--------------------+
++-----------------------------------------------------------------------------------+
+|                               BROWSER CLIENT LAYER                                |
+|   - Zero-install WebRTC Video/Audio Receiver                                      |
+|   - Low-latency Pointer Lock / Gamepad Input Capture                             |
++-----------------------------------------------------------------------------------+
+                                          │
+                   WebRTC / WebSockets (Inputs & Audio/Video)
+                                          ▼
++-----------------------------------------------------------------------------------+
+|                           EDGE ROUTER & PROXY LAYER                               |
+|                     (Evolved from quake3-proxy-server)                            |
+|   - Dynamic Session Routing & Token Auth                                          |
+|   - Protocol Translation (WebRTC <-> Legacy Game UDP / Shared Memory)            |
++-----------------------------------------------------------------------------------+
+                                          │
+                      Internal Low-Latency Orchestration
+                                          ▼
++-----------------------------------------------------------------------------------+
+|                        OFFSCREEN GPU & CONTAINER ENGINE                           |
+|                     (Evolved from elastic-game-server)                            |
+|   - Offscreen Headless GPU Virtualization (X11/Wayland / EGL / NVENC)             |
+|   - Pre-Tested Curated Game Containers (Emscripten, RetroArch, ioquake3, Wine)   |
+|   - Secret Storage Node Fetching (Decrypted Asset Pre-caching)                    |
++-----------------------------------------------------------------------------------+
 
 ```
 
 ---
 
-## Core Technologies & Dependencies
+## Section 3: Technical Implementation Plan
 
-* **Language/Bundler**: TypeScript, Vite
-* **Database**: `@sqlite.org/sqlite-wasm` (persisted to OPFS)
-* **Transcoding Engine**: `@ffmpeg/ffmpeg`, `@ffmpeg/util` (FFmpeg compiled to WASM)
-* **Local File System**: File System Access API (`showDirectoryPicker`)
-* **Torrent Engine**: `webtorrent` (configured with WebSocket-to-TCP tracker gateways)
-* **P2P Networking**: WebRTC (`simple-peer` or native `RTCPeerConnection`)
+1. **Offscreen GPU Runtime & Virtual Display Pipeline:** Containerized Headless Execution Engine.
+Build headless container images utilizing EGL and virtual X11/Wayland frames (`Xvfb`/`VirGL`/`NVIDIA-Container-Toolkit`). Game instances render offscreen directly to framebuffers and encode via hardware video acceleration (NVENC/VAAPI) to zero-copy WebRTC video tracks (`H.264`/`AV1`).
 
----
 
-## Getting Started
+2. **Protocol & Proxy Translation Engine:** Evolved quake3-proxy-server.
+Expand protocol proxying into a dual-mode tunnel:
 
-### Prerequisites
+1. **Input Pipeline:** Capture client key events, mouse delta, and gamepad inputs over high-priority WebRTC DataChannels, mapping them directly to virtual event devices (`/dev/uinput`) or network sockets on the host.
+2. **Network Intercept:** Translate browser transport calls into standard UDP packets for legacy multiplayer games.
 
-* Node.js v18.0.0 or higher
-* Modern Chromium-based browser or Firefox (supporting SharedArrayBuffer, Web Assembly, and OPFS)
 
-### Installation
+3. **Elastic Orchestrator & Secret CDN Integration:** Evolved elastic-game-server.
+Deploy a Kubernetes/Nomad orchestrator that maintains warm standby GPU workers. Upon client request:
 
-```bash
-# Clone the repository
-git clone [https://github.com/briancullinan2/mediaserver.git](https://github.com/briancullinan2/mediaserver.git)
-cd mediaserver
+1. Authenticate session token and fetch verified game ROMs/assets from encrypted storage nodes.
+2. Mount game assets into an ephemeral GPU container.
+3. Stream frame output via WebRTC within under 100ms startup latency.
 
-# Install dependencies
-npm install
 
-# Start local development server with required COOP/COEP headers
-npm run dev
+4. **Curated Verification & Compatibility Layer:** Tested Arcade Registry.
+Maintain a curated library manifest for pre-configured, tested configurations (RetroArch cores, Emscripten WASM builds, Native Linux ports, Direct3D/Wine wrappers). Eliminates client compatibility failures by guaranteeing optimal offscreen execution flags.
 
-```
-
-> **Note on SharedArrayBuffer**: Multithreaded FFmpeg.wasm requires Cross-Origin Isolation. The Vite dev server is preconfigured with the following headers:
-> ```http
-> Cross-Origin-Opener-Policy: same-origin
-> Cross-Origin-Embedder-Policy: require-corp
->
-> ```
->
->
-
----
-
-## Module Breakdown
-
-### 1. File Indexer & Storage Layer (`src/core/fs/`)
-
-* Mounts local folders using `window.showDirectoryPicker()`.
-* Recursively walks file paths and stores inode metadata in SQLite WASM.
-* Generates persistent file handles in OPFS for zero-copy stream reading using `FileSystemFileHandle.getFile()`.
-
-### 2. Worker Transcoder (`src/workers/transcoder.worker.ts`)
-
-* Executes inside a dedicated `Worker` context.
-* Consumes binary chunks via `ReadableStream` or `Blob.slice()`.
-* Converts incompatible video containers (e.g., MKV/HEVC to MP4/H.264) on the fly and returns fragmented MP4 streams for MSE (`MediaSource`) consumption.
-
-### 3. BitTorrent WebSocket Gateway (`src/network/torrent/`)
-
-* Uses `webtorrent` in pure client-side mode.
-* Communicates with public BitTorrent swarms via WebSocket-to-TCP bridge proxies or native WebRTC torrent seeds.
-
-### 4. P2P Sharing Subsystem (`src/network/p2p/`)
-
-* Establishes direct WebRTC data pipes between running browser tabs.
-* Allows Tab A (holding local file handles) to serve video segments directly to Tab B without uploading files to a cloud server.
-
----
-
-## Project Structure
-
-```
-mediaserver/
-├── public/
-│   ├── ffmpeg/             # Static WASM binaries for FFmpeg
-│   └── favicon.ico
-├── src/
-│   ├── components/         # UI Elements, Video Player, File Explorer
-│   ├── core/
-│   │   ├── db/             # SQLite WASM initialization & schema migrations
-│   │   ├── fs/             # File System Access API wrappers & OPFS drivers
-│   │   └── media/          # Demuxers, MediaSource Extensions (MSE) pipeline
-│   ├── network/
-│   │   ├── bittorrent/     # WebTorrent integration & proxy client
-│   │   └── p2p/            # WebRTC peer connection manager
-│   ├── workers/
-│   │   ├── indexer.worker.ts
-│   │   └── transcoder.worker.ts
-│   ├── main.ts             # Application entrypoint
-│   └── service-worker.ts   # PWA offline asset caching
-├── package.json
-├── tsconfig.json
-└── vite.config.ts
-
-```
-
----
-
-## Production Build & Deployment
-
-Because `mediaserver-js` is completely client-side, the build output consists of static assets that can be hosted on any static site hosting service (GitHub Pages, Cloudflare Pages, Vercel, or Nginx).
-
-```bash
-# Build the production package
-npm run build
-
-# Preview production build locally
-npm run preview
-
-```
-
-### Static Hosting Header Configuration
-
-Ensure your web host provides cross-origin isolation headers for multithreaded WASM support:
-
-```nginx
-# Nginx configuration snippet
-location / {
-    add_header Cross-Origin-Opener-Policy "same-origin";
-    add_header Cross-Origin-Embedder-Policy "require-corp";
-}
-
-```

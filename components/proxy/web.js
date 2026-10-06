@@ -704,7 +704,7 @@ const customMimeTypes = {
 let noFS = false;
 let runServer = false;
 let forwardIP = '';
-let httpPort = 4000;
+let httpPort = 4004;
 let masterPort = 27950;
 console.log(process.argv);
 for(let i = 0; i < process.argv.length; i++)
