@@ -99,7 +99,7 @@ export const MODULE_REGISTRY: Record<string, ComponentRoute> = {
 	'rcon': {
 		label: 'RCON Console',
 		url: './components/rcon/widget.ts',
-		className: 'RconWidget',
+		className: 'RCONWidget',
 		iconClass: 'bx bx-terminal', // or 'bx bx-broadcast' / 'bx bx-command'
 		subtext: 'Interfaces with UDP/TCP RCON packet protocols, challenge-response auth handlers, cvar autocomplete caches, and live log stream parsers.',
 		description: 'A direct game server remote administration tool for executing console commands, managing server cvars in real time, kicking/banning players, and broadcasting server messages.'

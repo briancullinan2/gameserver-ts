@@ -11,7 +11,8 @@ import type { GlobalToolbarsWindow, RepositorySettingsWindow } from '../bundle/m
 
 const LINES_TO_SCROLLBACK = 5000;
 
-const terminalSelf: TerminalWindow & LuminoLayoutWindow & GlobalToolbarsWindow & RepositorySettingsWindow = self as unknown as any;
+const terminalSelf: TerminalWindow & LuminoLayoutWindow & GlobalToolbarsWindow
+	& RepositorySettingsWindow = self as unknown as any;
 
 terminalSelf.terminalFrameLimiter = new FrameRater(25, (e, t, frame) =>
 {
@@ -449,7 +450,7 @@ export class TerminalWidget extends Widget
 	private claimAndRenderSession(): void
 	{
 		const manager = TerminalPoolManager.getInstance();
-		const shouldInitAll = manager.count() === 0;
+		const shouldInitAll = manager.count() === 0 && this.filterId === 'all';
 
 		// Acquire a terminal context (reused primary or dedicated secondary/tertiary split)
 		this.currentTerminalCtx = manager.acquireTerminal(this);

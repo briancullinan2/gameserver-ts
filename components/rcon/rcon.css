@@ -1,0 +1,218 @@
+/* Server Console Lumino Widget Base Styles */
+.sc-widget-container {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+	background-color: #1a1a1a;
+	color: #e0e0e0;
+	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+	box-sizing: border-box;
+}
+
+/* Split Panel Container */
+.sc-split-panel {
+	display: flex;
+	flex: 1;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+/* Left Sidebar: Server Manager */
+.sc-sidebar {
+	width: 320px;
+	min-width: 260px;
+	background-color: #222224;
+	border-right: 1px solid #333336;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+.sc-sidebar-header {
+	padding: 8px 12px;
+	background-color: #2a2a2d;
+	font-weight: bold;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: #888;
+	border-bottom: 1px solid #333336;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.sc-filter-bar {
+	display: flex;
+	gap: 6px;
+	padding: 8px;
+	background-color: #1e1e20;
+	border-bottom: 1px solid #333336;
+}
+
+.sc-filter-bar input,
+.sc-filter-bar select {
+	background-color: #121214;
+	border: 1px solid #3a3a3d;
+	color: #fff;
+	padding: 4px 6px;
+	border-radius: 3px;
+	font-size: 12px;
+	outline: none;
+}
+
+.sc-filter-bar input[type="text"] {
+	flex: 1;
+}
+
+.sc-server-list {
+	flex: 1;
+	overflow-y: auto;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.sc-server-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
+	border-bottom: 1px solid #2a2a2d;
+	cursor: pointer;
+	font-size: 13px;
+	transition: background 0.15s ease;
+}
+
+.sc-server-item:hover {
+	background-color: #2e2e32;
+}
+
+.sc-server-item.active {
+	background-color: #0d47a1;
+	color: #fff;
+}
+
+.sc-server-info {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.sc-server-name {
+	font-weight: 600;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.sc-server-meta {
+	font-size: 11px;
+	color: #aaa;
+	margin-top: 2px;
+}
+
+.sc-status-indicator {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	margin-right: 8px;
+	display: inline-block;
+}
+
+.sc-status-online {
+	background-color: #4caf50;
+}
+
+.sc-status-offline {
+	background-color: #f44336;
+}
+
+.sc-status-pinging {
+	background-color: #ff9800;
+}
+
+/* Right Panel: Terminal & Top Toolbar */
+.sc-main-panel {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	background-color: #121212;
+}
+
+.sc-top-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	background-color: #252528;
+	border-bottom: 1px solid #333336;
+}
+
+.sc-top-toolbar input {
+	background-color: #18181a;
+	border: 1px solid #3a3a3d;
+	color: #00ff66;
+	font-family: monospace;
+	padding: 4px 8px;
+	border-radius: 3px;
+	font-size: 12px;
+}
+
+.sc-btn {
+	background-color: #333337;
+	border: 1px solid #444448;
+	color: #e0e0e0;
+	padding: 4px 8px;
+	border-radius: 3px;
+	cursor: pointer;
+	font-size: 12px;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.sc-btn:hover {
+	background-color: #44444a;
+	color: #fff;
+}
+
+.sc-terminal-wrapper {
+	flex: 1;
+	position: relative;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+/* Quick Insert Command Bar */
+.sc-command-bar {
+	display: flex;
+	gap: 6px;
+	padding: 6px 10px;
+	background-color: #1a1a1c;
+	border-top: 1px solid #333336;
+	overflow-x: auto;
+	white-space: nowrap;
+}
+
+.sc-cmd-chip {
+	background-color: #28282c;
+	border: 1px solid #3e3e42;
+	color: #88c0d0;
+	font-family: monospace;
+	padding: 3px 8px;
+	border-radius: 12px;
+	font-size: 11px;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.sc-cmd-chip:hover {
+	background-color: #3b4252;
+	color: #eceff4;
+	border-color: #88c0d0;
+}
