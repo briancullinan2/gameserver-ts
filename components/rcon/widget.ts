@@ -2,6 +2,8 @@ import { Widget } from '@lumino/widgets';
 // Placeholder import for your working TerminalWidget from another thread
 import { TerminalWidget } from '../terminal/widget';
 import { Message } from '@lumino/messaging';
+import { LuminoLayoutWindow } from '../bundle/lumino.d';
+import { LuminoMenuWindow, RepositorySettingsWindow } from '../bundle/menu.d';
 
 export interface ServerEntry
 {
@@ -23,6 +25,8 @@ export interface Q3NetworkConfig
 	socksPort: number;
 	netPort: number;
 }
+
+const widgetSelf: LuminoLayoutWindow & LuminoMenuWindow & RepositorySettingsWindow = self as unknown as any;
 
 export class RCONWidget extends Widget
 {
@@ -58,6 +62,7 @@ export class RCONWidget extends Widget
 	private heartbeatTimer: any = null;
 	private reconnect: boolean = false;
 	private terminalContainer?: HTMLDivElement;
+	private _websocketState?: HTMLDivElement;
 
 	constructor(title?: string)
 	{
@@ -412,7 +417,7 @@ export class RCONWidget extends Widget
 	private initQ3Socks5Networking(): void
 	{
 		const fullAddress = `${this.netConfig.socksPort === 443 ? 'wss' : 'ws'}://${this.netConfig.socksServer}:${this.netConfig.socksPort}`;
-		debugger;
+
 		try
 		{
 			this.socket1 = new WebSocket(fullAddress);
@@ -428,6 +433,16 @@ export class RCONWidget extends Widget
 			this.socket2.addEventListener('error', (e) => this.onSocketError(e));
 
 			this.heartbeatTimer = setInterval(() => this.sendHeartbeats(), 9000);
+
+			if(!this._websocketState)
+			{
+				this._websocketState = widgetSelf.statusBar?.node.querySelector('#status-item-ws-state') as HTMLDivElement;
+			}
+			if(!this._websocketState)
+			{
+				this._websocketState = widgetSelf.statusBar?.addStatusItem('ws-state', '[WS] Loading', 'bx bx-radio-circle', 'right');
+			}
+
 		} catch(err)
 		{
 			console.error('Failed to initialize SOCKS5 WebSockets:', err);
@@ -488,6 +503,12 @@ export class RCONWidget extends Widget
 			case 2:
 				// Step 3: Emscripten Bridge Port Handshake
 				this.sendEmscriptenPortMessage(ws, this.netConfig.netPort);
+				widgetSelf.statusBar?.updateStatusItem('ws-state', '[WS] Active');
+				const stateNode = this._websocketState?.querySelector('i');
+				if(stateNode)
+				{
+					stateNode.className = 'bx bx-circle-marked';
+				}
 				ws.fresh = 3;
 				break;
 

@@ -158,14 +158,19 @@ export class LayoutAdjuster
 					mode: luminoSelf.layoutState?.panels === 'left-hand-files' ? 'split-right' : 'split-left'
 				});
 			}
-			if(shouldActivate)
+			requestAnimationFrame(() =>
 			{
-				dockPanel.activateWidget(newWidget);
-			}
-			if(shouldResize)
-			{
-				luminoSelf.resizeHandler?.();
-			}
+				if(shouldActivate)
+				{
+					dockPanel.activateWidget(newWidget);
+					newWidget.fit();
+					newWidget.update();
+				}
+				if(shouldResize)
+				{
+					luminoSelf.resizeHandler?.();
+				}
+			});
 			return;
 		}
 
@@ -183,14 +188,20 @@ export class LayoutAdjuster
 			{
 				dockPanel.addWidget(newWidget, { mode: luminoSelf.layoutState?.panels === 'left-hand-files' ? 'split-left' : 'split-right' });
 			}
-			if(shouldActivate)
+			requestAnimationFrame(() =>
 			{
-				dockPanel.activateWidget(newWidget);
-			}
-			if(shouldResize)
-			{
-				luminoSelf.resizeHandler?.();
-			}
+				if(shouldActivate)
+				{
+					dockPanel.activateWidget(newWidget);
+					newWidget.fit();
+					newWidget.update();
+				}
+				if(shouldResize)
+				{
+					luminoSelf.resizeHandler?.();
+				}
+
+			});
 			return;
 		}
 
@@ -238,14 +249,19 @@ export class LayoutAdjuster
 				console.log('Opening tab-after');
 				dockPanel.addWidget(newWidget, { mode: 'tab-after' });
 			}
-			if(shouldActivate)
+			requestAnimationFrame(() =>
 			{
-				dockPanel.activateWidget(newWidget);
-			}
-			if(shouldResize)
-			{
-				luminoSelf.resizeHandler?.();
-			}
+				if(shouldActivate)
+				{
+					dockPanel.activateWidget(newWidget);
+					newWidget.fit();
+					newWidget.update();
+				}
+				if(shouldResize)
+				{
+					luminoSelf.resizeHandler?.();
+				}
+			});
 			return;
 		}
 
@@ -254,14 +270,19 @@ export class LayoutAdjuster
 			mode: 'tab-after',
 			ref: luminoSelf.lastInteractedWidget ?? undefined
 		});
-		if(shouldActivate)
+		requestAnimationFrame(() =>
 		{
-			dockPanel.activateWidget(newWidget);
-		}
-		if(shouldResize)
-		{
-			luminoSelf.resizeHandler?.();
-		}
+			if(shouldActivate)
+			{
+				dockPanel.activateWidget(newWidget);
+				newWidget.fit();
+				newWidget.update();
+			}
+			if(shouldResize)
+			{
+				luminoSelf.resizeHandler?.();
+			}
+		});
 	}
 
 

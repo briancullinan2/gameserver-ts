@@ -140,7 +140,10 @@
 	display: flex;
 	flex-direction: column;
 	height: 100%;
+	width: 100%;
 	background-color: #121212;
+	max-width: 100%;
+	overflow: hidden;
 }
 
 .sc-top-toolbar {
@@ -215,4 +218,9 @@
 	background-color: #3b4252;
 	color: #eceff4;
 	border-color: #88c0d0;
+}
+
+.sc-terminal-wrapper .terminal-filter-widget {
+	height: 100%;
+	width: 100%;
 }

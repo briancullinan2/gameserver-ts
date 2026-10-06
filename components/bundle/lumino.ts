@@ -264,6 +264,11 @@ async function startServiceWorker()
 		{
 			iconNode.className = 'bx bx-error-circle';
 		}
+		const stateNode = workerState?.querySelector('i');
+		if(stateNode)
+		{
+			stateNode.className = 'bx bx-error-circle';
+		}
 	}
 
 

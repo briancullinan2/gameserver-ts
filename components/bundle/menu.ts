@@ -80,6 +80,14 @@ export const MODULE_REGISTRY: Record<string, ComponentRoute> = {
 		subtext: 'Requires WebSockets/SOCKS5 session tracking, stat aggregation APIs, character skin filters, and user inventory state synchronization.',
 		description: 'A unified roster and player hub displaying active server players, character skins, historical stats, and public inventory items.'
 	},
+	'streamer': {
+		label: 'Live Studio',
+		url: './components/streamer/widget.ts',
+		className: 'StreamerWidget',
+		iconClass: 'bx bx-broadcast',
+		subtext: 'Built on Canvas2D / WebGL scene composition, WebAudio API mixer, FFmpeg WASM transcoding, and WebRTC / RTMP streaming outputs.',
+		description: 'An OBS-style browser streaming studio for real-time video scene composition, audio source mixing, FFmpeg WebAssembly encoding, and multi-destination live video egress.'
+	},
 	'assets': {
 		label: 'Asset Library',
 		url: './components/assets/widget.ts',
