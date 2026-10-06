@@ -59,11 +59,11 @@ export class RCONWidget extends Widget
 	private reconnect: boolean = false;
 	private terminalContainer?: HTMLDivElement;
 
-	constructor()
+	constructor(title?: string)
 	{
 		super();
 		this.addClass('sc-widget-container');
-		this.title.label = 'RCON Console';
+		this.title.label = title ?? 'RCON Console';
 		this.title.iconClass = 'bx bx-terminal-remote';
 		this.title.closable = true;
 
@@ -164,7 +164,7 @@ export class RCONWidget extends Widget
 		// Sidebar Header - Master Servers
 		const masterHeader = document.createElement('div');
 		masterHeader.className = 'sc-sidebar-header';
-		masterHeader.innerHTML = `<span>Master Server List</span><button class="sc-btn" id="sc-refresh-master"><i class='bx bx-refresh'></i></button>`;
+		masterHeader.innerHTML = `<span>Master Server List</span><button class="sc-btn" id="sc-refresh-master"><i class='bx bx-refresh-cw'></i></button>`;
 
 		this.serverListEl = document.createElement('ul');
 		this.serverListEl.className = 'sc-server-list';
@@ -411,8 +411,8 @@ export class RCONWidget extends Widget
 	/* ------------------------------------------------------------------ */
 	private initQ3Socks5Networking(): void
 	{
-		const fullAddress = `ws://${this.netConfig.socksServer}:${this.netConfig.socksPort}`;
-
+		const fullAddress = `${this.netConfig.socksPort === 443 ? 'wss' : 'ws'}://${this.netConfig.socksServer}:${this.netConfig.socksPort}`;
+		debugger;
 		try
 		{
 			this.socket1 = new WebSocket(fullAddress);
@@ -528,7 +528,7 @@ export class RCONWidget extends Widget
 	{
 		socket.send(Uint8Array.from([
 			0xFF, 0xFF, 0xFF, 0xFF,
-			'p'.charCodeAt(0), 'o'.charCodeAt(0), 'r'.charCodeAt(0), 'r'.charCodeAt(0),
+			'p'.charCodeAt(0), 'o'.charCodeAt(0), 'r'.charCodeAt(0), 't'.charCodeAt(0),
 			(port & 0xFF00) >> 8, (port & 0xFF)
 		]));
 	}
@@ -580,7 +580,7 @@ export class RCONWidget extends Widget
 	public refreshMasterServerList(): void
 	{
 		// Query official dpmaster / Quake 3 master server for full list
-		this.sendQ3UDPMessage('master.quake3arena.com', 27900, 'getservers 68 full empty');
+		this.sendQ3UDPMessage('master.quake3arena.com', 27950, 'getservers 68 full empty');
 	}
 
 	private pingServer(server: ServerEntry): void
