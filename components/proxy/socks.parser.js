@@ -276,6 +276,10 @@ class Parser extends EventEmitter
 					break;
 
 				case STATE_METHODS:
+					if(!this._methods)
+					{
+						break;
+					}
 					left = this._methods.length - this._methodsp;
 					chunkLeft = len - i;
 					minLen = left < chunkLeft ? left : chunkLeft;
@@ -353,6 +357,10 @@ class Parser extends EventEmitter
 					break;
 
 				case STATE_REQ_DSTADDR:
+					if(!_dstaddr)
+					{
+						break;
+					}
 					left = _dstaddr.length - _dstaddrp;
 					chunkLeft = len - i;
 					minLen = left < chunkLeft ? left : chunkLeft;
@@ -374,6 +382,10 @@ class Parser extends EventEmitter
 					break;
 
 				case STATE_REQ_DSTPORT:
+					if(!_dstaddr)
+					{
+						break;
+					}
 					if(_dstport === undefined)
 					{
 						_dstport = this._buffer[i];

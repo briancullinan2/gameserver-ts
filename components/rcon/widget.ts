@@ -2,10 +2,11 @@ import { Widget } from '@lumino/widgets';
 // Placeholder import for your working TerminalWidget from another thread
 import { TerminalWidget } from '../terminal/widget';
 import { Message } from '@lumino/messaging';
-import { LuminoLayoutWindow } from '../bundle/lumino.d';
-import { GlobalToolbarsWindow, LuminoMenuWindow, RepositorySettingsWindow } from '../bundle/menu.d';
+import type { LuminoLayoutWindow } from '../bundle/lumino.d';
+import type { GlobalToolbarsWindow, LuminoMenuWindow, RepositorySettingsWindow } from '../bundle/menu.d';
 import { ISocketMessage, WebSocketMonitor } from './websocket';
 import { IAddServerArgs, IRemoveServerArgs, IServerSelectedArgs, MasterListWidget } from './widget-master';
+import type { SettingConfig } from '../bundle/settings';
 
 const widgetSelf: {
 	WebSocketMonitor: typeof WebSocketMonitor;
@@ -19,10 +20,12 @@ export interface ServerEntry
 	mod: string;
 	players: number;
 	maxPlayers: number;
+	when: Date;
 	ping: number;
 	hasBots: boolean;
 	isFavorite: boolean;
 	status: 'online' | 'offline' | 'pinging';
+	rawStatus?: string;
 }
 
 export interface Q3NetworkConfig
@@ -113,6 +116,10 @@ export class RCONWidget extends Widget
 	private selectServer(server: ServerEntry)
 	{
 		this.addrInput.value = server.address;
+		if(server.rawStatus)
+		{
+			console.info(server.rawStatus);
+		}
 		this.updateStarIcon();
 	}
 
@@ -290,10 +297,10 @@ export class RCONWidget extends Widget
 		// }
 
 		// Print raw out-of-band RCON/Server responses directly to terminal
-		if(this.terminalWidget && typeof (this.terminalWidget as any).write === 'function')
-		{
-			(this.terminalWidget as any).write(text.replace(/\xFF\xFF\xFF\xFF/g, '') + '\r\n');
-		}
+		// if(this.terminalWidget && typeof (this.terminalWidget as any).write === 'function')
+		// {
+		// 	(this.terminalWidget as any).write(text.replace(/\xFF\xFF\xFF\xFF/g, '') + '\r\n');
+		// }
 	}
 
 
@@ -332,3 +339,38 @@ export class RCONWidget extends Widget
 	}
 
 }
+
+
+const LOCAL_SETTINGS: Record<string, Record<string, SettingConfig>> = {
+	terminal: {
+		masterServers: {
+			key: 'masters_list',
+			default: [],
+			type: 'json',
+			description: 'List of master servers listing other servers.',
+		},
+		favoriteServers: {
+			key: 'favorites_list',
+			default: [],
+			type: 'json',
+			description: 'List of servers you favorited.'
+		}
+	},
+
+};
+
+
+if(!widgetSelf.IMPORT_SETTINGS)
+{
+	widgetSelf.IMPORT_SETTINGS = {};
+}
+
+for(const [moduleKey, configs] of Object.entries(LOCAL_SETTINGS))
+{
+	widgetSelf.IMPORT_SETTINGS[moduleKey] = {
+		...(widgetSelf.IMPORT_SETTINGS[moduleKey] || {}),
+		...configs
+	};
+}
+
+export const IMPORT_SETTINGS = widgetSelf.IMPORT_SETTINGS;

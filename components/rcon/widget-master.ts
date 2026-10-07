@@ -1,12 +1,17 @@
 import { Widget } from "@lumino/widgets";
-import { ISocketMessage, WebSocketMonitor } from "./websocket";
+import type { ISocketMessage, WebSocketMonitor } from "./websocket";
 import type { ServerEntry } from "./widget";
 import { ISignal, Signal } from '@lumino/signaling';
 import { Message } from "@lumino/messaging";
 import type { LuminoLayoutWindow } from "../bundle/lumino.d";
 
+export const STALE_TIMEOUT = 30000;
+export const STALE_INTERVAL = 30000;
+export const MAP_TIMEOUT = 60000 * 3;
+
 const widgetSelf: LuminoLayoutWindow & {
 	WebSocketMonitor: typeof WebSocketMonitor;
+	MasterListWidget: typeof MasterListWidget;
 } = self as unknown as any;
 
 export interface IServerSelectedArgs
@@ -32,18 +37,66 @@ export interface IRemoveServerArgs
 
 export class MasterListWidget extends Widget
 {
+	private serverItemHeight: number = 44; // Default fallback height in pixels
+	private hasMeasuredItemHeight: boolean = false;
+	private bufferItemCount: number = 5;
+
 	private serverListEl!: HTMLUListElement;
 	private favoriteListEl!: HTMLUListElement;
+	public masters: ServerEntry[] = [
+		{
+			id: 'mas_' + Date.now() + '_' + widgetSelf.nextTemp?.(),
+			name: 'Localhost',
+			address: 'localhost',
+			mod: 'baseq3',
+			players: 0,
+			maxPlayers: 16,
+			ping: 0,
+			hasBots: false,
+			isFavorite: true,
+			status: 'pinging',
+			when: new Date
+		},
+		{
+			id: 'mas_' + Date.now() + '_' + widgetSelf.nextTemp?.(),
+			name: 'Origin',
+			address: window.location.hostname,
+			mod: 'baseq3',
+			players: 0,
+			maxPlayers: 16,
+			ping: 0,
+			hasBots: false,
+			isFavorite: true,
+			status: 'pinging',
+			when: new Date
+		},
+		// {
+		// 	id: 'mas_' + Date.now() + '_' + widgetSelf.nextTemp?.(),
+		// 	name: 'Quake 3 Original Public',
+		// 	address: 'master.quake3arena.com',
+		// 	mod: 'baseq3',
+		// 	players: 0,
+		// 	maxPlayers: 16,
+		// 	ping: 0,
+		// 	hasBots: false,
+		// 	isFavorite: true,
+		// 	status: 'pinging',
+		// 	when: new Date
+		// }
+	];
 	private servers: ServerEntry[] = [];
 	public favorites: ServerEntry[] = [];
 	private activeServer: ServerEntry | null = null;
 	private modFilter: string = 'all';
 	private hideBots: boolean = false;
-	private subResponse: (_: any, args: ISocketMessage) => void = (_, args) => this.handleIncomingQ3Packet(args.address, args.data);
+	private subResponse: (_: any, args: ISocketMessage) => void = (_, args) => this.handleIncomingQ3Packet(args.address, args.port, args.data);
 
 	private _serverSelected: Signal<Widget, IServerSelectedArgs> = new Signal<Widget, IServerSelectedArgs>(this);
 
 	private static _instance: MasterListWidget;
+	private staleInterval?: ReturnType<typeof setInterval>;
+	private cachedFilteredServers: ServerEntry[] = [];
+	private cachedFilteredFavorites: ServerEntry[] = [];
 
 	public get serverSelected(): ISignal<Widget, IServerSelectedArgs>
 	{
@@ -62,6 +115,15 @@ export class MasterListWidget extends Widget
 	public get removeServer(): ISignal<Widget, IRemoveServerArgs>
 	{
 		return this._removeServerClicked;
+	}
+
+	public static getInstance()
+	{
+		if(!this._instance)
+		{
+			this._instance = new MasterListWidget();
+		}
+		return this._instance;
 	}
 
 	constructor(title?: string)
@@ -87,7 +149,28 @@ export class MasterListWidget extends Widget
 
 		widgetSelf.WebSocketMonitor.serverResponse.connect(this.subResponse);
 		this.refreshMasterServerList();
+		this.staleInterval = setInterval(() => this.markStale(), STALE_INTERVAL);
 	}
+
+
+	private markStale()
+	{
+		for(const server of this.masters.concat(this.servers))
+		{
+			if(server.when.getTime() < Date.now() - STALE_TIMEOUT
+				&& server.status !== 'online')
+			{
+				server.status = 'offline';
+			}
+
+			if(server.when.getTime() < Date.now() - MAP_TIMEOUT)
+			{
+				this.pingServer(server);
+			}
+		}
+		this.renderServerLists();
+	}
+
 
 	public processMessage(msg: Message): void
 	{
@@ -105,7 +188,12 @@ export class MasterListWidget extends Widget
 
 	protected override onBeforeDetach(msg: Message): void
 	{
+		if(this.staleInterval)
+		{
+			clearInterval(this.staleInterval);
+		}
 		widgetSelf.WebSocketMonitor.serverResponse.disconnect(this.subResponse);
+		super.onBeforeDetach(msg);
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -113,8 +201,17 @@ export class MasterListWidget extends Widget
 	/* ------------------------------------------------------------------ */
 	public refreshMasterServerList(): void
 	{
-		// Query official dpmaster / Quake 3 master server for full list
-		widgetSelf.WebSocketMonitor.sendQ3UDPMessage('master.quake3arena.com', 27950, 'getservers 68 full empty');
+		for(const master of this.masters)
+		{
+			const parts = master.address.split(':');
+			const host = parts[0];
+			const port = parseInt(parts[1] || '27950', 10);
+			master.status = 'pinging';
+			master.when = new Date;
+			// Query official dpmaster / Quake 3 master server for full list
+			widgetSelf.WebSocketMonitor.sendQ3UDPMessage(host, port, 'getservers 68 full empty');
+		}
+		this.renderServerLists();
 	}
 
 
@@ -199,45 +296,305 @@ export class MasterListWidget extends Widget
 		{
 			this.refreshMasterServerList();
 		});
+
+		this.serverListEl.addEventListener('scroll', () => this.onVirtualScroll(this.serverListEl, false));
+		this.favoriteListEl.addEventListener('scroll', () => this.onVirtualScroll(this.favoriteListEl, true));
+
+	}
+
+
+	/**
+	 * Custom Comparator for Server Ordering
+	 */
+	private sortServers(a: ServerEntry, b: ServerEntry): number
+	{
+		const aIsMaster = a.id?.startsWith('mas_') ? 1 : 0;
+		const bIsMaster = b.id?.startsWith('mas_') ? 1 : 0;
+
+		// 1. Master Servers Priority (`mas_` IDs float to top)
+		if(aIsMaster !== bIsMaster)
+		{
+			return bIsMaster - aIsMaster;
+		}
+
+		// 2. Status Rank (online/offline higher than 'pinging')
+		const aIsPinging = a.status === 'pinging' ? 1 : a.status === 'offline' ? 2 : 0;
+		const bIsPinging = b.status === 'pinging' ? 1 : b.status === 'offline' ? 2 : 0;
+		if(aIsPinging !== bIsPinging)
+		{
+			return aIsPinging - bIsPinging; // 0 (resolved) comes before 1 (pinging)
+		}
+
+		// 3. Alphanumerical Natural Sort by Name (fallback to Address)
+		const nameA = a.name || a.address || '';
+		const nameB = b.name || b.address || '';
+
+		return nameA.localeCompare(nameB, undefined, {
+			numeric: true,
+			sensitivity: 'base'
+		});
+	}
+
+
+	private filterServers(s: ServerEntry)
+	{
+		if(this.modFilter !== 'all' && s.mod !== this.modFilter) return false;
+		if(this.hideBots && s.hasBots) return false;
+		return true;
 	}
 
 	/* ------------------------------------------------------------------ */
 	/* 2. Server List Management & Rendering                             */
 	/* ------------------------------------------------------------------ */
+	// private renderServerLists(): void
+	// {
+	// 	this.serverListEl.innerHTML = '';
+	// 	this.favoriteListEl.innerHTML = '';
+
+	// 	// Render Master & Regular Servers (Filtered + Sorted)
+	// 	this.servers
+	// 		.concat(this.masters)
+	// 		.filter(this.filterServers)
+	// 		.sort(this.sortServers)
+	// 		.forEach(server =>
+	// 		{
+	// 			this.serverListEl.appendChild(this.createServerItemNode(server, false));
+	// 		});
+
+	// 	// Render Favorites (Filtered + Sorted)
+	// 	this.favorites
+	// 		.filter(this.filterServers)
+	// 		.sort(this.sortServers)
+	// 		.forEach(server =>
+	// 		{
+	// 			this.favoriteListEl.appendChild(this.createServerItemNode(server, true));
+	// 		});
+	// }
+
+	private getFilteredAndSortedServers(query: ServerEntry[])
+	{
+		return query
+			.filter((s) => this.filterServers(s))
+			.sort((a, b) => this.sortServers(a, b));
+	}
+
 	private renderServerLists(): void
 	{
-		this.serverListEl.innerHTML = '';
-		this.favoriteListEl.innerHTML = '';
+		// Cache filtered & sorted lists
+		this.cachedFilteredServers = this.getFilteredAndSortedServers(this.servers.concat(this.masters));
+		this.cachedFilteredFavorites = this.getFilteredAndSortedServers(this.favorites);
 
-		const filterFn = (s: ServerEntry) =>
-		{
-			if(this.modFilter !== 'all' && s.mod !== this.modFilter) return false;
-			if(this.hideBots && s.hasBots) return false;
-			return true;
-		};
+		// Virtual render both containers
+		this.renderVirtualViewport(this.serverListEl, this.cachedFilteredServers, false);
+		this.renderVirtualViewport(this.favoriteListEl, this.cachedFilteredFavorites, true);
+	}
 
-		// Render Master Servers
-		this.servers.filter(filterFn).forEach(server =>
+	private onVirtualScroll(container: HTMLUListElement, isFavorite: boolean): void
+	{
+		const list = isFavorite ? this.cachedFilteredFavorites : this.cachedFilteredServers;
+		this.renderVirtualViewport(container, list, isFavorite);
+	}
+
+
+
+	private renderVirtualViewport(container: HTMLUListElement, list: ServerEntry[], isFavorite: boolean): void
+	{
+		// 0. Short-circuit if container is not visible in DOM
+		if(!container.offsetParent && container.clientHeight === 0)
 		{
-			this.serverListEl.appendChild(this.createServerItemNode(server, false));
+			return;
+		}
+
+		const totalItems = list.length;
+
+		if(totalItems === 0)
+		{
+			const cacheKey = '0-0-0';
+			if(container.dataset.lastRenderState !== cacheKey)
+			{
+				container.innerHTML = '<li class="sc-empty-notice" style="padding: 12px; color: #666; font-size: 11px;">No servers found</li>';
+				container.dataset.lastRenderState = cacheKey;
+			}
+			return;
+		}
+
+		// 1. Measure first item height if not yet captured
+		if(!this.hasMeasuredItemHeight && container.firstElementChild)
+		{
+			const measured = container.firstElementChild.getBoundingClientRect().height;
+			if(measured > 0)
+			{
+				this.serverItemHeight = measured;
+				this.hasMeasuredItemHeight = true;
+			}
+		}
+
+		// 2. Calculate Visible Window
+		const scrollTop = container.scrollTop;
+		const clientHeight = container.clientHeight || 250;
+
+		let startIndex = Math.floor(scrollTop / this.serverItemHeight) - this.bufferItemCount;
+		let endIndex = Math.ceil((scrollTop + clientHeight) / this.serverItemHeight) + this.bufferItemCount;
+
+		startIndex = Math.max(0, startIndex);
+		endIndex = Math.min(totalItems, endIndex);
+
+		// 3. Short-circuit if visible window index bounds haven't changed
+		const renderStateKey = `${startIndex}-${endIndex}-${totalItems}`;
+		if(container.dataset.lastRenderState === renderStateKey)
+		{
+			return;
+		}
+		container.dataset.lastRenderState = renderStateKey;
+
+		const paddingTop = startIndex * this.serverItemHeight;
+		const paddingBottom = (totalItems - endIndex) * this.serverItemHeight;
+
+		// 4. Targeted DOM Reconciliation
+		let topSpacer = container.querySelector('.sc-spacer-top') as HTMLLIElement;
+		let bottomSpacer = container.querySelector('.sc-spacer-bottom') as HTMLLIElement;
+
+		// Remove empty notice if present
+		const notice = container.querySelector('.sc-empty-notice');
+		if(notice) notice.remove();
+
+		// Ensure Top Spacer
+		if(!topSpacer)
+		{
+			topSpacer = document.createElement('li');
+			topSpacer.className = 'sc-virtual-spacer sc-spacer-top';
+			topSpacer.style.pointerEvents = 'none';
+			container.prepend(topSpacer);
+		}
+		topSpacer.style.height = `${paddingTop}px`;
+		topSpacer.style.display = paddingTop > 0 ? 'block' : 'none';
+
+		// Ensure Bottom Spacer
+		if(!bottomSpacer)
+		{
+			bottomSpacer = document.createElement('li');
+			bottomSpacer.className = 'sc-virtual-spacer sc-spacer-bottom';
+			bottomSpacer.style.pointerEvents = 'none';
+			container.appendChild(bottomSpacer);
+		}
+		bottomSpacer.style.height = `${paddingBottom}px`;
+		bottomSpacer.style.display = paddingBottom > 0 ? 'block' : 'none';
+
+		// Build map of currently rendered item nodes
+		const prefix = isFavorite ? 'fav-item-' : 'srv-item-';
+		const existingNodes = new Map<string, HTMLLIElement>();
+
+		container.querySelectorAll<HTMLLIElement>(`li[id^="${prefix}"]`).forEach(node =>
+		{
+			existingNodes.set(node.id, node);
 		});
 
-		// Render Favorites
-		this.favorites.filter(filterFn).forEach(server =>
+		// Reconcile nodes in the active slice
+		const visibleSlice = list.slice(startIndex, endIndex);
+		const sliceIds = new Set<string>();
+
+		visibleSlice.forEach(server =>
 		{
-			this.favoriteListEl.appendChild(this.createServerItemNode(server, true));
+			const id = `${prefix}${server.id}`;
+			sliceIds.add(id);
+
+			let node = existingNodes.get(id);
+			if(!node)
+			{
+				// New node entering viewport
+				node = this.createServerItemNode(server, isFavorite);
+				container.insertBefore(node, bottomSpacer);
+			} else
+			{
+				// Re-order node before bottom spacer to preserve DOM order
+				container.insertBefore(node, bottomSpacer);
+			}
 		});
+
+		// Clean up nodes that scrolled out of view
+		existingNodes.forEach((node, id) =>
+		{
+			if(!sliceIds.has(id))
+			{
+				node.remove();
+			}
+		});
+	}
+
+
+	public updateServerEntry(updatedServer: ServerEntry, isFavorite: boolean = false): void
+	{
+		const container = isFavorite ? this.favoriteListEl : this.serverListEl;
+		const prefix = isFavorite ? 'fav-item-' : 'srv-item-';
+		const elementId = `${prefix}${updatedServer.id}`;
+
+		// 1. Refresh cached master array item
+		const arrayRef = isFavorite ? this.favorites : this.servers;
+		const idx = arrayRef.findIndex(s => s.id === updatedServer.id);
+		if(idx >= 0)
+		{
+			arrayRef[idx] = updatedServer;
+		} else if(updatedServer.id.startsWith('mas_'))
+		{
+			const mIdx = this.masters.findIndex(m => m.id === updatedServer.id);
+			if(mIdx >= 0) this.masters[mIdx] = updatedServer;
+		}
+
+		// Recalculate list order
+		const fullList = isFavorite ? this.favorites : this.servers.concat(this.masters);
+		const filteredList = this.getFilteredAndSortedServers(fullList);
+		if(isFavorite) this.cachedFilteredFavorites = filteredList;
+		else this.cachedFilteredServers = filteredList;
+
+		const newSortedIndex = filteredList.findIndex(s => s.id === updatedServer.id);
+		const existingNode = container.querySelector(`#${CSS.escape(elementId)}`) as HTMLLIElement | null;
+
+		// 2. If element is currently visible in DOM, perform targeted update/positioning
+		if(existingNode)
+		{
+			// Update node content in-place
+			const newNode = this.createServerItemNode(updatedServer, isFavorite);
+			existingNode.replaceWith(newNode);
+
+			// Determine if element needs reordering among currently rendered siblings
+			const visibleChildren = Array.from(container.children).filter(
+				el => !el.classList.contains('sc-virtual-spacer')
+			) as HTMLLIElement[];
+
+			const currentDomIndex = visibleChildren.indexOf(newNode);
+
+			// Check adjacent sibling indices against target sorted list index
+			if(newSortedIndex >= 0)
+			{
+				const nextServerInSorted = filteredList[newSortedIndex + 1];
+				if(nextServerInSorted)
+				{
+					const nextDomNode = container.querySelector(`#${CSS.escape(prefix + nextServerInSorted.id)}`);
+					if(nextDomNode && nextDomNode !== newNode.nextElementSibling)
+					{
+						container.insertBefore(newNode, nextDomNode);
+					}
+				}
+			}
+		} else
+		{
+			// 3. If element is not rendered in current viewport, re-trigger virtual scroller view slice calculation
+			this.renderVirtualViewport(container, filteredList, isFavorite);
+		}
 	}
 
 	private createServerItemNode(server: ServerEntry, isFavList: boolean): HTMLLIElement
 	{
 		const li = document.createElement('li');
+		const prefix = isFavList ? 'fav-item-' : 'srv-item-';
+		li.id = `${prefix}${server.id}`;
 		li.className = `sc-server-item ${this.activeServer?.id === server.id ? 'active' : ''}`;
 
 		const statusClass = server.status === 'online' ? 'sc-status-online' :
 			server.status === 'offline' ? 'sc-status-offline' : 'sc-status-pinging';
 
 		li.innerHTML = `
+			<button class="sc-btn sc-favorite-btn"><i class='bx bx-star'></i></button>
 			<div class="sc-server-info">
 				<div class="sc-server-name">
 					<span class="sc-status-indicator ${statusClass}"></span>
@@ -250,7 +607,12 @@ export class MasterListWidget extends Widget
 
 		li.addEventListener('click', (e) =>
 		{
-			if((e.target as HTMLElement).closest('.sc-remove-btn'))
+			if((e.target as HTMLElement).closest('.sc-favorite-btn'))
+			{
+				this.addFavoriteByAddress(server.address);
+				this.renderServerLists();
+				return;
+			} else if((e.target as HTMLElement).closest('.sc-remove-btn'))
 			{
 				e.stopPropagation();
 				if(isFavList)
@@ -283,7 +645,7 @@ export class MasterListWidget extends Widget
 		const some = this.favorites.find(f => f.address === address);
 		if(some) return some;
 		const newFav: ServerEntry = {
-			id: 'fav_' + Date.now(),
+			id: 'fav_' + Date.now() + '_' + widgetSelf.nextTemp?.(),
 			name: address,
 			address: address,
 			mod: 'baseq3',
@@ -292,7 +654,8 @@ export class MasterListWidget extends Widget
 			ping: 0,
 			hasBots: false,
 			isFavorite: true,
-			status: 'pinging'
+			status: 'pinging',
+			when: new Date
 		};
 		this.favorites.push(newFav);
 		this.renderServerLists();
@@ -344,7 +707,8 @@ export class MasterListWidget extends Widget
 					ping: 0,
 					hasBots: false,
 					isFavorite: false,
-					status: 'pinging'
+					status: 'pinging',
+					when: new Date
 				});
 				i += 7;
 			} else
@@ -353,46 +717,97 @@ export class MasterListWidget extends Widget
 			}
 		}
 
-		this.servers = discovered.slice(0, 50); // Cap first 50 discovered nodes
+		this.servers = Array.from(
+			new Map([...this.servers, ...discovered].map(server => [server.address, server])).values()
+		);
 		this.renderServerLists();
 
 		// Trigger asynchronous getstatus pings to populate details
-		this.servers.forEach(s => this.pingServer(s));
+		discovered.forEach(s => this.pingServer(s));
 	}
 
-	private parseStatusResponse(fromAddr: string, rawText: string): void
-	{
-		const lines = rawText.split('\n');
-		if(lines.length < 2) return;
 
-		const infoTokens = lines[0].split('\\');
+	private parseStatusResponse(fromAddr: string, remotePort: number, rawText: string): void
+	{
+		// 1. Sanitize Out-of-Band Header (\xFF\xFF\xFF\xFFstatusResponse\n)
+		const cleanText = rawText.replace(/^[\s\S]*?statusResponse\s*[\r\n]*/i, '').trim();
+		const lines = cleanText.split(/\r?\n/);
+		if(lines.length === 0 || !lines[0]) return;
+
+		// 2. Parse Cvar Key/Value Pairs
+		// Quake 3 info strings start with a backslash: \sv_hostname\MyServer\mapname\q3dm17...
+		const rawCvars = lines[0].startsWith('\\') ? lines[0].substring(1) : lines[0];
+		const infoTokens = rawCvars.split('\\');
 		const kvMap: Record<string, string> = {};
-		for(let i = 1; i < infoTokens.length; i += 2)
+
+		for(let i = 0; i < infoTokens.length - 1; i += 2)
 		{
-			kvMap[infoTokens[i]] = infoTokens[i + 1];
+			kvMap[infoTokens[i].toLowerCase()] = infoTokens[i + 1];
 		}
 
-		const serverName = (kvMap['sv_hostname'] || fromAddr).replace(/\^\d/g, ''); // strip Q3 color codes
-		const modName = kvMap['gamename'] || 'baseq3';
-		const maxPlayers = parseInt(kvMap['sv_maxclients'] || '16', 10);
-		const playerCount = lines.length - 2;
-		const hasBots = lines.some(l => l.includes('bot') || l.includes('ping 0'));
+		// 3. Extract Server Metadata & Strip Color Codes (^0-^9, ^a-^z)
+		const rawHostname = kvMap['sv_hostname'] || kvMap['hostname'] || fromAddr;
+		const serverName = rawHostname.replace(/\^./g, '').trim();
+		const modName = kvMap['gamename'] || kvMap['game'] || 'baseq3';
+		const maxPlayers = parseInt(kvMap['sv_maxclients'] || kvMap['maxclients'] || '16', 10);
 
+		// 4. Parse Active Player Roster & Bot Detection
+		// Player lines format: <score> <ping> "<name>"
+		let playerCount = 0;
+		let hasBots = false;
+		let calculatedPingSum = 0;
+		let validPingCount = 0;
+
+		for(let i = 1; i < lines.length; i++)
+		{
+			const line = lines[i].trim();
+			if(!line) continue;
+
+			playerCount++;
+			const parts = line.split(/\s+/);
+			if(parts.length >= 2)
+			{
+				const ping = parseInt(parts[1], 10);
+
+				// Ping of 0 or bot tags indicate AI clients in Q3 engines
+				if(ping === 0 || line.toLowerCase().includes('bot'))
+				{
+					hasBots = true;
+				} else if(!isNaN(ping) && ping > 0)
+				{
+					calculatedPingSum += ping;
+					validPingCount++;
+				}
+			}
+		}
+
+		// Average player ping or estimated latency fallback
+		const averagePing = validPingCount > 0
+			? Math.round(calculatedPingSum / validPingCount)
+			: 20;
+
+		// 5. Update Target Server Entries
+		const targetAddress = `${fromAddr}:${remotePort}`;
 		const updateEntry = (s: ServerEntry) =>
 		{
 			s.name = serverName;
 			s.mod = modName;
 			s.players = Math.max(0, playerCount);
-			s.maxPlayers = maxPlayers;
+			s.maxPlayers = isNaN(maxPlayers) ? 16 : maxPlayers;
 			s.hasBots = hasBots;
 			s.status = 'online';
-			s.ping = Math.floor(Math.random() * 40) + 20; // Estimated RTT
+			s.ping = averagePing;
+			s.rawStatus = rawText;
+			s.when = new Date();
+
+			// Perform Targeted DOM update on Virtual Scroller
+			const isFav = this.favorites.some(f => f.id === s.id);
+			this.updateServerEntry(s, isFav);
 		};
 
-		this.servers.filter(s => s.address.includes(fromAddr)).forEach(updateEntry);
-		this.favorites.filter(f => f.address.includes(fromAddr)).forEach(updateEntry);
-
-		this.renderServerLists();
+		// Match both by full address (IP:Port) or IP substring fallback
+		this.servers.filter(s => s.address === targetAddress || s.address.includes(fromAddr)).forEach(updateEntry);
+		this.favorites.filter(f => f.address === targetAddress || f.address.includes(fromAddr)).forEach(updateEntry);
 	}
 
 	private toggleCurrentFavorite(): void
@@ -422,21 +837,33 @@ export class MasterListWidget extends Widget
 		}
 	}
 
-	private pingServer(server: ServerEntry): void
+	public pingServer(server: ServerEntry): void
 	{
 		const parts = server.address.split(':');
 		const host = parts[0];
 		const port = parseInt(parts[1] || '27960', 10);
+		if(server.status !== 'online')
+		{
+			server.status = 'pinging';
+		}
+		server.when = new Date;
 		widgetSelf.WebSocketMonitor.sendQ3UDPMessage(host, port, 'getstatus');
 	}
 
-	private handleIncomingQ3Packet(fromAddr: string, data: Uint8Array): void
+	private handleIncomingQ3Packet(fromAddr: string, port: number = 27960, data: Uint8Array): void
 	{
 		const text = new TextDecoder().decode(data);
 
 		// Handle Master Server Response: getserversResponse
 		if(text.includes('getserversResponse'))
 		{
+			const master = this.masters.find(m => m.address.replaceAll('\0', '') === fromAddr
+				|| m.address.replaceAll('\0', '') === fromAddr + ':' + port
+			);
+			if(master)
+			{
+				master.status = 'online';
+			}
 			this.parseMasterServerResponse(data);
 			return;
 		}
@@ -444,8 +871,10 @@ export class MasterListWidget extends Widget
 		// Handle Individual Server Response: statusResponse
 		if(text.includes('statusResponse'))
 		{
-			this.parseStatusResponse(fromAddr, text);
+			this.parseStatusResponse(fromAddr, port, text);
 			return;
 		}
 	}
 }
+
+widgetSelf.MasterListWidget = MasterListWidget;

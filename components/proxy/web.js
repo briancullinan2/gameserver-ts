@@ -774,9 +774,9 @@ if(runServer)
 	const express = require('express');
 	const app = express();
 	const http = require('http');
-	const master = require('./master.js');
+	//const master = require('./master.js');
 
-	master(masterPort);
+	//master(masterPort);
 
 	app.enable('etag');
 	app.set('etag', 'strong');
@@ -824,7 +824,7 @@ if(runServer)
 
 	app.use(
 		/**
-		 * @param {express.} err
+		 * @param {Error | any} err
 		 * @param {express.Request} req
 		 * @param {express.Response} res
 		 * @param {Function} next
