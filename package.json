@@ -8,6 +8,7 @@
 	"main": "index.js",
 	"scripts": {
 		"test": "echo \"Error: no test specified\" && exit 1",
+		"master": "node components/proxy/master.js",
 		"start": "node components/proxy/web.js",
 		"build-manifest": "npx ts-node -O \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" components/bundle/generate-manifest.ts",
 		"build-settings": "npx ts-node -O \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" components/bundle/settings-coalescer.ts",

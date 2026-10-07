@@ -219,6 +219,7 @@ class Parser extends EventEmitter
 				this._buffer[i + 7] === 116    // 't'
 			)
 			{
+				// TODO: prevent socket hijacking by reassining to somebody elses socket
 				_dstport = (this._buffer[i + 8] << 8) + this._buffer[i + 9];
 				this.authed = true;
 				console.info(`[SOCKS Parser] Intercepted UDP port handshake -> Port ${_dstport}`);

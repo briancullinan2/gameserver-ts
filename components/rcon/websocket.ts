@@ -117,7 +117,7 @@ export class WebSocketMonitor
 		const ws = evt.target as WebSocket;
 		const tag = ws === this.socket1 ? 'socket1' : ws === this.socket2 ? 'socket2' : 'unknown';
 
-		console.error(`[WSMonitor] ${tag} encounter error:`, evt);
+		console.error(`[WSMonitor] ${tag} encountered an error:`, evt);
 		this.previousError = new Date();
 		this.reconnect = true;
 

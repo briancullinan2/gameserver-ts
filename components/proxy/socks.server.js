@@ -17,7 +17,7 @@ const Parser = require('./socks.parser');
 const Huffman = require('./huffman.js');
 const SHOWNET = require('./shownet');
 
-const { proxyCommand } = require('./socks.0');
+const { proxyCommand } = require('./socks.0.js');
 
 // ============================================================================
 // CONSTANTS & DICTIONARIES

@@ -8,10 +8,6 @@
  */
 
 const ip6addr = require('ip6addr');
-const { proxyCONNECTCommand } = require('./socks.3.js');
-const { proxyBINDCommand } = require('./socks.2.js');
-const { proxyUDPCommand } = require('./socks.1.js');
-const { proxyWSCommand } = require('./socks.4.js');
 
 // ============================================================================
 // TYPE DECLARATIONS & IMPORTS
@@ -70,15 +66,19 @@ async function proxyCommand(socket, reqInfo, onData)
 	switch(reqInfo.cmd)
 	{
 		case 0x01: // CONNECT
+			const { proxyCONNECTCommand } = require('./socks.1.js');
 			await proxyCONNECTCommand.call(this, socket, reqInfo, onData);
 			break;
 		case 0x02: // BIND
+			const { proxyBINDCommand } = require('./socks.2.js');
 			await proxyBINDCommand.call(this, socket, reqInfo, onData);
 			break;
 		case 0x03: // UDP ASSOCIATE
+			const { proxyUDPCommand } = require('./socks.3.js');
 			await proxyUDPCommand.call(this, socket, reqInfo, onData);
 			break;
 		case 0x04: // WEBSOCKET BRIDGE
+			const { proxyWSCommand } = require('./socks.4.js');
 			await proxyWSCommand.call(this, socket, reqInfo, onData);
 			break;
 		default:
