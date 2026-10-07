@@ -47,7 +47,7 @@ export class MasterListWidget extends Widget
 		{
 			id: 'mas_' + Date.now() + '_' + widgetSelf.nextTemp?.(),
 			name: 'Localhost',
-			address: 'localhost',
+			address: '127.0.0.1',
 			mod: 'baseq3',
 			players: 0,
 			maxPlayers: 16,
@@ -161,6 +161,7 @@ export class MasterListWidget extends Widget
 				&& server.status !== 'online')
 			{
 				server.status = 'offline';
+				server.when = new Date;
 			}
 
 			if(server.when.getTime() < Date.now() - MAP_TIMEOUT)
@@ -206,6 +207,7 @@ export class MasterListWidget extends Widget
 			const parts = master.address.split(':');
 			const host = parts[0];
 			const port = parseInt(parts[1] || '27950', 10);
+
 			master.status = 'pinging';
 			master.when = new Date;
 			// Query official dpmaster / Quake 3 master server for full list
@@ -419,9 +421,9 @@ export class MasterListWidget extends Widget
 		}
 
 		// 1. Measure first item height if not yet captured
-		if(!this.hasMeasuredItemHeight && container.firstElementChild)
+		if(!this.hasMeasuredItemHeight && container.firstElementChild?.nextElementSibling)
 		{
-			const measured = container.firstElementChild.getBoundingClientRect().height;
+			const measured = container.firstElementChild.nextElementSibling.getBoundingClientRect().height;
 			if(measured > 0)
 			{
 				this.serverItemHeight = measured;
@@ -440,7 +442,8 @@ export class MasterListWidget extends Widget
 		endIndex = Math.min(totalItems, endIndex);
 
 		// 3. Short-circuit if visible window index bounds haven't changed
-		const renderStateKey = `${startIndex}-${endIndex}-${totalItems}`;
+		const visibleSlice = list.slice(startIndex, endIndex);
+		const renderStateKey = `${startIndex}-${endIndex}-${totalItems}-${visibleSlice.map(s => s.id + s.when).join('-')}`;
 		if(container.dataset.lastRenderState === renderStateKey)
 		{
 			return;
@@ -490,7 +493,6 @@ export class MasterListWidget extends Widget
 		});
 
 		// Reconcile nodes in the active slice
-		const visibleSlice = list.slice(startIndex, endIndex);
 		const sliceIds = new Set<string>();
 
 		visibleSlice.forEach(server =>
@@ -507,6 +509,7 @@ export class MasterListWidget extends Widget
 			} else
 			{
 				// Re-order node before bottom spacer to preserve DOM order
+				this.createServerItemNode(server, isFavorite);
 				container.insertBefore(node, bottomSpacer);
 			}
 		});
@@ -522,97 +525,82 @@ export class MasterListWidget extends Widget
 	}
 
 
-	public updateServerEntry(updatedServer: ServerEntry, isFavorite: boolean = false): void
-	{
-		const container = isFavorite ? this.favoriteListEl : this.serverListEl;
-		const prefix = isFavorite ? 'fav-item-' : 'srv-item-';
-		const elementId = `${prefix}${updatedServer.id}`;
-
-		// 1. Refresh cached master array item
-		const arrayRef = isFavorite ? this.favorites : this.servers;
-		const idx = arrayRef.findIndex(s => s.id === updatedServer.id);
-		if(idx >= 0)
-		{
-			arrayRef[idx] = updatedServer;
-		} else if(updatedServer.id.startsWith('mas_'))
-		{
-			const mIdx = this.masters.findIndex(m => m.id === updatedServer.id);
-			if(mIdx >= 0) this.masters[mIdx] = updatedServer;
-		}
-
-		// Recalculate list order
-		const fullList = isFavorite ? this.favorites : this.servers.concat(this.masters);
-		const filteredList = this.getFilteredAndSortedServers(fullList);
-		if(isFavorite) this.cachedFilteredFavorites = filteredList;
-		else this.cachedFilteredServers = filteredList;
-
-		const newSortedIndex = filteredList.findIndex(s => s.id === updatedServer.id);
-		const existingNode = container.querySelector(`#${CSS.escape(elementId)}`) as HTMLLIElement | null;
-
-		// 2. If element is currently visible in DOM, perform targeted update/positioning
-		if(existingNode)
-		{
-			// Update node content in-place
-			const newNode = this.createServerItemNode(updatedServer, isFavorite);
-			existingNode.replaceWith(newNode);
-
-			// Determine if element needs reordering among currently rendered siblings
-			const visibleChildren = Array.from(container.children).filter(
-				el => !el.classList.contains('sc-virtual-spacer')
-			) as HTMLLIElement[];
-
-			const currentDomIndex = visibleChildren.indexOf(newNode);
-
-			// Check adjacent sibling indices against target sorted list index
-			if(newSortedIndex >= 0)
-			{
-				const nextServerInSorted = filteredList[newSortedIndex + 1];
-				if(nextServerInSorted)
-				{
-					const nextDomNode = container.querySelector(`#${CSS.escape(prefix + nextServerInSorted.id)}`);
-					if(nextDomNode && nextDomNode !== newNode.nextElementSibling)
-					{
-						container.insertBefore(newNode, nextDomNode);
-					}
-				}
-			}
-		} else
-		{
-			// 3. If element is not rendered in current viewport, re-trigger virtual scroller view slice calculation
-			this.renderVirtualViewport(container, filteredList, isFavorite);
-		}
-	}
-
 	private createServerItemNode(server: ServerEntry, isFavList: boolean): HTMLLIElement
 	{
-		const li = document.createElement('li');
 		const prefix = isFavList ? 'fav-item-' : 'srv-item-';
-		li.id = `${prefix}${server.id}`;
-		li.className = `sc-server-item ${this.activeServer?.id === server.id ? 'active' : ''}`;
+		const nodeId = `${prefix}${server.id}`;
+
+		// 1. Try to find an existing DOM node to merge data into
+		let li = document.getElementById(nodeId) as HTMLLIElement | null;
 
 		const statusClass = server.status === 'online' ? 'sc-status-online' :
 			server.status === 'offline' ? 'sc-status-offline' : 'sc-status-pinging';
 
+		const isActive = this.activeServer?.id === server.id;
+
+		// 2. If node already exists, update properties in-place (in-place merge)
+		if(li)
+		{
+			// Toggle active state
+			li.classList.toggle('active', isActive);
+
+			// Update status indicator class
+			const statusNode = li.querySelector('.sc-status-indicator');
+			if(statusNode)
+			{
+				statusNode.className = `sc-status-indicator ${statusClass}`;
+			}
+
+			// Update server name text node
+			const nameNode = li.querySelector('.sc-server-name');
+			if(nameNode)
+			{
+				// Preserve the status indicator span while updating server name
+				const indicatorSpan = nameNode.querySelector('.sc-status-indicator');
+				nameNode.textContent = server.name;
+				if(indicatorSpan)
+				{
+					nameNode.prepend(indicatorSpan);
+				}
+			}
+
+			// Update metadata string
+			const metaNode = li.querySelector('.sc-server-meta');
+			if(metaNode)
+			{
+				metaNode.textContent = `${server.address} | ${server.mod} | ${server.players}/${server.maxPlayers} (${server.ping}ms)`;
+			}
+
+			return li;
+		}
+
+		// 3. Otherwise, construct a brand new node if it doesn't exist yet
+		li = document.createElement('li');
+		li.id = nodeId;
+		li.className = `sc-server-item ${isActive ? 'active' : ''}`;
+
 		li.innerHTML = `
-			<button class="sc-btn sc-favorite-btn"><i class='bx bx-star'></i></button>
-			<div class="sc-server-info">
-				<div class="sc-server-name">
-					<span class="sc-status-indicator ${statusClass}"></span>
-					${server.name}
-				</div>
-				<div class="sc-server-meta">${server.address} | ${server.mod} | ${server.players}/${server.maxPlayers} (${server.ping}ms)</div>
-			</div>
-			<button class="sc-btn sc-remove-btn"><i class='bx bx-trash'></i></button>
-		`;
+            <button class="sc-btn sc-favorite-btn"><i class='bx bx-star'></i></button>
+            <div class="sc-server-info">
+                <div class="sc-server-name">
+                    <span class="sc-status-indicator ${statusClass}"></span>
+                    ${server.name}
+                </div>
+                <div class="sc-server-meta">${server.address} | ${server.mod} | ${server.players}/${server.maxPlayers} (${server.ping}ms)</div>
+            </div>
+            <button class="sc-btn sc-remove-btn"><i class='bx bx-trash'></i></button>
+        `;
 
 		li.addEventListener('click', (e) =>
 		{
-			if((e.target as HTMLElement).closest('.sc-favorite-btn'))
+			const target = e.target as HTMLElement;
+
+			if(target.closest('.sc-favorite-btn'))
 			{
 				this.addFavoriteByAddress(server.address);
 				this.renderServerLists();
 				return;
-			} else if((e.target as HTMLElement).closest('.sc-remove-btn'))
+			} else if(target.closest('.sc-remove-btn'))
 			{
 				e.stopPropagation();
 				if(isFavList)
@@ -629,6 +617,8 @@ export class MasterListWidget extends Widget
 
 		return li;
 	}
+
+
 
 	private selectServer(server: ServerEntry): void
 	{
@@ -720,6 +710,7 @@ export class MasterListWidget extends Widget
 		this.servers = Array.from(
 			new Map([...this.servers, ...discovered].map(server => [server.address, server])).values()
 		);
+
 		this.renderServerLists();
 
 		// Trigger asynchronous getstatus pings to populate details
@@ -802,12 +793,13 @@ export class MasterListWidget extends Widget
 
 			// Perform Targeted DOM update on Virtual Scroller
 			const isFav = this.favorites.some(f => f.id === s.id);
-			this.updateServerEntry(s, isFav);
+			//this.updateServerEntry(s, isFav);
 		};
 
 		// Match both by full address (IP:Port) or IP substring fallback
 		this.servers.filter(s => s.address === targetAddress || s.address.includes(fromAddr)).forEach(updateEntry);
 		this.favorites.filter(f => f.address === targetAddress || f.address.includes(fromAddr)).forEach(updateEntry);
+		this.renderServerLists();
 	}
 
 	private toggleCurrentFavorite(): void
@@ -863,6 +855,7 @@ export class MasterListWidget extends Widget
 			if(master)
 			{
 				master.status = 'online';
+				master.when = new Date;
 			}
 			this.parseMasterServerResponse(data);
 			return;
