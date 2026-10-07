@@ -428,7 +428,10 @@ export class WebSocketMonitor
 		// Add dummy/active player list: "score ping name"
 		statusString += `0 15 "^2WebPlayer^7"\n`;
 
-		this.sendQ3UDPMessage(targetAddr, port, statusString);
+		requestAnimationFrame(() =>
+		{
+			this.sendQ3UDPMessage(targetAddr, port, statusString);
+		});
 	}
 
 	/**
@@ -459,7 +462,10 @@ export class WebSocketMonitor
 
 		const infoString = `infoResponse\n\\${formattedVars}`;
 
-		this.sendQ3UDPMessage(targetAddr, port, infoString);
+		requestAnimationFrame(() =>
+		{
+			this.sendQ3UDPMessage(targetAddr, port, infoString);
+		});
 	}
 
 

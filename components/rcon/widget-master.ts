@@ -90,7 +90,13 @@ export class MasterListWidget extends Widget
 	private activeServer: ServerEntry | null = null;
 	private modFilter: string = 'all';
 	private hideBots: boolean = false;
-	private subResponse: (_: any, args: ISocketMessage) => void = (_, args) => this.handleIncomingQ3Packet(args.address, args.port, args.data);
+	private subResponse: (_: any, args: ISocketMessage) => void = (_, args) =>
+	{
+		requestAnimationFrame(() =>
+		{
+			this.handleIncomingQ3Packet(args.address, args.port, args.data);
+		});
+	};
 
 	private _serverSelected: Signal<Widget, IServerSelectedArgs> = new Signal<Widget, IServerSelectedArgs>(this);
 
@@ -721,20 +727,20 @@ export class MasterListWidget extends Widget
 				const ip = `${data[i + 1]}.${data[i + 2]}.${data[i + 3]}.${data[i + 4]}`;
 				const port = (data[i + 5] << 8) + data[i + 6];
 				const address = `${ip}:${port}`;
-
-				discovered.push({
+				const existing = this.servers.find(s => s.address === address || s.address.includes(address));
+				discovered.push(Object.assign(existing ?? {}, {
 					id: 'srv_' + Math.random().toString(36).substr(2, 9),
-					name: address,
+					name: existing?.name ?? address,
 					address: address,
-					mod: 'baseq3',
-					players: 0,
-					maxPlayers: 16,
-					ping: 0,
-					hasBots: false,
-					isFavorite: false,
-					status: 'pinging',
+					mod: existing?.mod ?? 'baseq3',
+					players: existing?.players ?? 0,
+					maxPlayers: existing?.maxPlayers ?? 16,
+					ping: existing?.ping ?? 0,
+					hasBots: existing?.hasBots ?? false,
+					isFavorite: existing?.isFavorite ?? false,
+					status: existing?.status === 'online' && existing?.when?.getTime() > Date.now() - STALE_TIMEOUT ? 'online' : 'pinging',
 					when: new Date
-				});
+				} as ServerEntry));
 				i += 7;
 			} else
 			{
@@ -758,6 +764,7 @@ export class MasterListWidget extends Widget
 		// 1. Sanitize Out-of-Band Header (\xFF\xFF\xFF\xFFstatusResponse\n)
 		const cleanText = rawText.replace(/^[\s\S]*?statusResponse\s*[\r\n]*/i, '').trim();
 		const lines = cleanText.split(/\r?\n/);
+
 		if(lines.length === 0 || !lines[0]) return;
 
 		// 2. Parse Cvar Key/Value Pairs
@@ -827,7 +834,7 @@ export class MasterListWidget extends Widget
 			s.when = new Date();
 
 			// Perform Targeted DOM update on Virtual Scroller
-			const isFav = this.favorites.some(f => f.id === s.id);
+			// const isFav = this.favorites.some(f => f.id === s.id);
 			//this.updateServerEntry(s, isFav);
 		};
 

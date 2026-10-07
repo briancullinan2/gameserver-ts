@@ -134,6 +134,14 @@ export const TOOLS_REGISTRY: Record<string, ComponentRoute> = {
 		subtext: 'Interfaces with SOCKS5/HTTP client proxies, bookmarking engines, web search scrapers, and URL metadata extraction pipelines.',
 		description: 'An in-browser content crawler and link discoverer that queries external game sites via proxy tunnels to index, bookmark, and import remote game files and web links.'
 	},
+	'browser': {
+		label: 'Mini Browser',
+		url: './components/ripper/widget-browser.ts',
+		className: 'BrowserWidget',
+		iconClass: 'bx bx-windows',
+		subtext: 'Built on sandboxed IFrame rendering, WebSocket SOCKS5/HTTP tunnel proxying, basic authentication controls, and automated scraper frontend integration.',
+		description: 'An embedded in-browser micro-browser for proxying HTTP site requests through custom WebSocket middleware, rendering isolated HTML content safely inside a sandboxed viewport for bookmark scraping and remote previewing.'
+	},
 	'slicer': {
 		label: 'Map Slicer',
 		url: './components/tools/widget-slicer.ts',
