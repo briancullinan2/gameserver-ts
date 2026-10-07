@@ -1,5 +1,6 @@
 import type { LuminoLayoutWindow } from "../bundle/lumino.d";
-import type { Q3NetworkConfig } from "./widget";
+import type { GlobalToolbarsWindow } from "../bundle/menu.d";
+import type { Q3NetworkConfig, ServerEntry } from "./widget";
 import { ISignal, Signal } from '@lumino/signaling';
 
 export interface ISocketMessage
@@ -9,7 +10,7 @@ export interface ISocketMessage
 	data: Uint8Array;
 }
 
-const widgetSelf: LuminoLayoutWindow & {
+const widgetSelf: LuminoLayoutWindow & GlobalToolbarsWindow & {
 	WebSocketMonitor: typeof WebSocketMonitor;
 } = self as unknown as any;
 
@@ -20,10 +21,10 @@ export class WebSocketMonitor
 	static heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
 
 	// SOCKS5 WebSockets Duplexing Engine
-	static netConfig: Q3NetworkConfig = {
+	public static netConfig: Q3NetworkConfig = {
 		socksServer: window.location.hostname || 'localhost',
 		socksPort: parseInt(window.location.port || '8080', 10),
-		netPort: 27960
+		netPort: 27960,
 	};
 	static reconnect: boolean = false;
 	static _websocketState?: HTMLDivElement;
@@ -207,8 +208,10 @@ export class WebSocketMonitor
 			case 3:
 				if(message.length === 10)
 				{
-					console.log(`[WSMonitor] ${tag} Handshake acknowledged by bridge`);
+					this.netConfig.assignedPort = (message[9] << 8) + message[8];
+					console.log(`[WSMonitor] ${tag} Handshake acknowledged by bridge, assigned port: ${this.netConfig.assignedPort}`);
 					ws.fresh = 4;
+					// this.registerGameServer(this.netConfig.netPort);
 					return; // FIX: Return here to prevent fallthrough to case 4/5!
 				}
 				return;
@@ -244,6 +247,12 @@ export class WebSocketMonitor
 					return;
 				}
 
+				// INTERCEPT COMMAND REQUESTS (e.g., getstatus)
+				if(this.handleInboundQ3Command(addrStr.trim(), remotePort, msgData))
+				{
+					return; // Intercepted and answered internally
+				}
+
 				this._serverResponse.emit({
 					address: addrStr.trim(),
 					port: remotePort,
@@ -252,6 +261,7 @@ export class WebSocketMonitor
 				break;
 		}
 	}
+
 
 	public static sendQ3UDPMessage(targetAddr: string, port: number, payload: string): void
 	{
@@ -344,6 +354,116 @@ export class WebSocketMonitor
 			stateNode.className = iconClass;
 		}
 	}
+
+	/**
+	 * Intercepts inbound master server and client queries (e.g. getstatus)
+	 * and manufactures a detailed server status payload.
+	 */
+	private static handleInboundQ3Command(senderAddr: string, senderPort: number, data: Uint8Array): boolean
+	{
+		// Check for standard OOB header 0xFFFFFFFF
+		if(data.length < 5 || data[0] !== 0xFF || data[1] !== 0xFF || data[2] !== 0xFF || data[3] !== 0xFF)
+		{
+			return false;
+		}
+
+		const commandText = new TextDecoder().decode(data.slice(4)).trim();
+
+		if(commandText.startsWith('getstatus'))
+		{
+			console.log(`[WSMonitor] Intercepted 'getstatus' from ${senderAddr}:${senderPort}. Generating manufactured response...`);
+			this.respondGetStatus(senderAddr, senderPort);
+			return true;
+		} else if(commandText.startsWith('getinfo'))
+		{
+			console.log(`[WSMonitor] Intercepted 'getinfo' from ${senderAddr}:${senderPort}. Generating info response...`);
+			this.respondGetInfo(senderAddr, senderPort);
+			return true;
+		}
+
+		return false;
+	}
+
+
+
+	/**
+	 * Manufactures a beautiful, highly detailed Q3 server status response.
+	 */
+	public static respondGetStatus(targetAddr: string, port: number): void
+	{
+		// Extract current map from client window.location
+		let currentMap = window.location.pathname.replace(/^\/|\/$/g, '').replace(/[^a-zA-Z0-9_\-]/g, '_');
+		if(!currentMap || currentMap === '')
+		{
+			currentMap = 'q3dm17'; // Fallback default map name
+		}
+
+		const hostName = document.title || 'Browser Quake3 Web Node';
+		const webSite = window.location.origin + window.location.pathname;
+
+		// Build Quake3 statusResponse key-value pairs
+		const serverVars: Record<string, string> = {
+			"gamename": "q3a",
+			"g_gametype": "0",
+			"net_port": String(this.netConfig.netPort),
+			"hostname": hostName,
+			"mapname": currentMap,
+			"clients": "1",
+			"sv_maxclients": "16",
+			"version": "Q3 1.32b web-browser",
+			"g_needpass": "0",
+			"sv_allowDownload": "1",
+			"web_site": webSite,
+			"hosting_provider": "Lumino WebSockets Proxy Engine",
+			"location": window.location.hostname
+		};
+
+		// Format into valid Quake 3 info string: \key1\val1\key2\val2
+		const formattedVars = Object.entries(serverVars)
+			.map(([k, v]) => `${k}\\${v}`)
+			.join('\\');
+
+		let statusString = `statusResponse\n\\${formattedVars}\n`;
+
+		// Add dummy/active player list: "score ping name"
+		statusString += `0 15 "^2WebPlayer^7"\n`;
+
+		this.sendQ3UDPMessage(targetAddr, port, statusString);
+	}
+
+	/**
+	 * Manufactures getinfo response for quick ping / server browser scanning.
+	 */
+	public static respondGetInfo(targetAddr: string, port: number): void
+	{
+		let currentMap = window.location.pathname.replace(/^\/|\/$/g, '').replace(/[^a-zA-Z0-9_\-]/g, '_');
+		if(!currentMap || currentMap === '') currentMap = 'q3dm17';
+
+		const hostName = document.title || 'Browser Quake3 Web Node';
+
+		const infoVars: Record<string, string> = {
+			"gamename": "q3a",
+			"hostname": hostName,
+			"mapname": currentMap,
+			"clients": "1",
+			"sv_maxclients": "16",
+			"game": "baseq3",
+			"g_gametype": "0",
+			"g_needpass": "0"
+		};
+
+		// Format into valid Quake 3 info string: \key1\val1\key2\val2
+		const formattedVars = Object.entries(infoVars)
+			.map(([k, v]) => `${k}\\${v}`)
+			.join('\\');
+
+		const infoString = `infoResponse\n\\${formattedVars}`;
+
+		this.sendQ3UDPMessage(targetAddr, port, infoString);
+	}
+
+
+
 }
 
 widgetSelf.WebSocketMonitor = WebSocketMonitor;

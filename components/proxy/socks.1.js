@@ -82,23 +82,21 @@ async function proxyCONNECTCommand(socket, reqInfo, onData)
 			// Payload already has an assigned target socket (e.g. UDP forwarding context)
 			if(socket.dstSock)
 			{
-				if(reqInfo.data)
+				// Send via dgram UDP send or TCP write depending on destination socket type
+				if(typeof (/** @type {any} */ (socket.dstSock).send) === 'function')
 				{
-					// Send via dgram UDP send or TCP write depending on destination socket type
-					if(typeof (/** @type {any} */ (socket.dstSock).send) === 'function')
-					{
-            /** @type {any} */ (socket.dstSock).send(
-						reqInfo.data,
-						0,
-						reqInfo.data.length,
-						reqInfo.dstPort,
-						reqInfo.dstIP
-					);
-					} else if(socket.dstSock instanceof Socket
-						&& typeof socket.dstSock.write === 'function')
-					{
-						socket.dstSock.write(reqInfo.data);
-					}
+						/** @type {any} */ (socket.dstSock).send(
+					reqInfo.data,
+					0,
+					reqInfo.data?.length,
+					reqInfo.dstPort,
+					reqInfo.dstIP
+				);
+				} else if(socket.dstSock instanceof Socket
+					&& typeof socket.dstSock.write === 'function'
+					&& reqInfo.data)
+				{
+					socket.dstSock.write(reqInfo.data);
 				}
 
 				const fallbackPort = socket._socket?.remotePort || reqInfo.srcPort || 0;

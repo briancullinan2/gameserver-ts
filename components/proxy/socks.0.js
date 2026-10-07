@@ -7,6 +7,7 @@
  * @description Internal SOCKS5 Utility Helpers for UDP framing, connection replies, and error handling.
  */
 
+const { Socket } = require('dgram');
 const ip6addr = require('ip6addr');
 
 // ============================================================================
@@ -211,7 +212,7 @@ function _onUDPMessage(udpLookupPort, isWebSocket, message, rinfo)
 		}
 		const portOffset = 4 + localbytes.length;
 		// Port MUST be Network Byte Order (Big Endian)
-		bufrep.writeUInt16LE(rinfo.port, portOffset);
+		bufrep.writeUInt16BE(rinfo.port, portOffset);
 	} else
 	{
 		bufrep[3] = ATYP.NAME;
@@ -219,7 +220,7 @@ function _onUDPMessage(udpLookupPort, isWebSocket, message, rinfo)
 		bufrep.write(domain, 5);
 
 		const portOffset = 5 + domain.length;
-		bufrep.writeUInt16LE(rinfo.port, portOffset);
+		bufrep.writeUInt16BE(rinfo.port, portOffset);
 	}
 
 	if(typeof SHOWNET === 'function')
@@ -288,9 +289,9 @@ function _onSocketConnect(udpLookupPort, reqInfo)
 		bufrep[p] = localbytes[i];
 	}
 
-	const boundPort = netSocket?.localPort || reqInfo.dstPort || 0;
+	const boundPort = /** @type {Socket} */ (socket.dstSock)?.address()?.port ?? socket._socket?.localPort ?? netSocket?.localPort ?? reqInfo.dstPort ?? 0;
 	// Port MUST be Big Endian for network byte order compliance
-	bufrep.writeUInt16LE(boundPort, p);
+	bufrep.writeUInt16BE(boundPort, p);
 
 	if(typeof socket.send === 'function')
 	{

@@ -4,12 +4,13 @@ import type { ServerEntry } from "./widget";
 import { ISignal, Signal } from '@lumino/signaling';
 import { Message } from "@lumino/messaging";
 import type { LuminoLayoutWindow } from "../bundle/lumino.d";
+import type { GlobalToolbarsWindow } from "../bundle/menu.d";
 
 export const STALE_TIMEOUT = 30000;
 export const STALE_INTERVAL = 30000;
 export const MAP_TIMEOUT = 60000 * 3;
 
-const widgetSelf: LuminoLayoutWindow & {
+const widgetSelf: LuminoLayoutWindow & GlobalToolbarsWindow & {
 	WebSocketMonitor: typeof WebSocketMonitor;
 	MasterListWidget: typeof MasterListWidget;
 } = self as unknown as any;
@@ -168,8 +169,36 @@ export class MasterListWidget extends Widget
 			{
 				this.pingServer(server);
 			}
+
+
 		}
 		this.renderServerLists();
+	}
+
+
+	/**
+	 * Extension Step 3: Register this web client as an active Q3 Game Server with master servers.
+	 */
+	public static registerGameServer(server?: ServerEntry, assignedPort?: number): void
+	{
+		console.log(`[WSMonitor] Registering server with assigned port ${widgetSelf.WebSocketMonitor.netConfig.assignedPort} on Q3 Master Servers...`);
+
+		// Send 'heartbeat Quake3Arena\n' payload to master server list
+		const heartbeatPayload = "heartbeat Quake3Arena\n";
+		const masterServers = widgetSelf.settingsManager?.get('rcon', 'masters_list') as ServerEntry[];
+		(server ? [server] : masterServers).forEach(master =>
+		{
+			const parts = master.address.split(':');
+			const host = parts[0];
+			const port = parseInt(parts[1] || '27950', 10);
+			console.log(`[WSMonitor] Sending Master Registration Heartbeat -> ${host}:${port}`);
+			master.heartbeat = new Date;
+			if(master.status !== 'online')
+			{
+				master.status = 'pinging';
+			}
+			widgetSelf.WebSocketMonitor.sendQ3UDPMessage(host, port, heartbeatPayload);
+		});
 	}
 
 
@@ -211,7 +240,10 @@ export class MasterListWidget extends Widget
 			master.status = 'pinging';
 			master.when = new Date;
 			// Query official dpmaster / Quake 3 master server for full list
-			widgetSelf.WebSocketMonitor.sendQ3UDPMessage(host, port, 'getservers 68 full empty');
+			requestAnimationFrame(() =>
+			{
+				widgetSelf.WebSocketMonitor.sendQ3UDPMessage(host, port, 'getservers 68 full empty');
+			});
 		}
 		this.renderServerLists();
 	}
@@ -382,13 +414,16 @@ export class MasterListWidget extends Widget
 
 	private renderServerLists(): void
 	{
-		// Cache filtered & sorted lists
-		this.cachedFilteredServers = this.getFilteredAndSortedServers(this.servers.concat(this.masters));
-		this.cachedFilteredFavorites = this.getFilteredAndSortedServers(this.favorites);
+		requestAnimationFrame(() =>
+		{
+			// Cache filtered & sorted lists
+			this.cachedFilteredServers = this.getFilteredAndSortedServers(this.servers.concat(this.masters));
+			this.cachedFilteredFavorites = this.getFilteredAndSortedServers(this.favorites);
 
-		// Virtual render both containers
-		this.renderVirtualViewport(this.serverListEl, this.cachedFilteredServers, false);
-		this.renderVirtualViewport(this.favoriteListEl, this.cachedFilteredFavorites, true);
+			// Virtual render both containers
+			this.renderVirtualViewport(this.serverListEl, this.cachedFilteredServers, false);
+			this.renderVirtualViewport(this.favoriteListEl, this.cachedFilteredFavorites, true);
+		});
 	}
 
 	private onVirtualScroll(container: HTMLUListElement, isFavorite: boolean): void
@@ -856,6 +891,8 @@ export class MasterListWidget extends Widget
 			{
 				master.status = 'online';
 				master.when = new Date;
+				// TODO: if(master) is actually in masters_list
+				MasterListWidget.registerGameServer(master);
 			}
 			this.parseMasterServerResponse(data);
 			return;

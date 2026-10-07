@@ -26,6 +26,7 @@ export interface ServerEntry
 	isFavorite: boolean;
 	status: 'online' | 'offline' | 'pinging';
 	rawStatus?: string;
+	heartbeat?: Date;
 }
 
 export interface Q3NetworkConfig
@@ -33,6 +34,7 @@ export interface Q3NetworkConfig
 	socksServer: string;
 	socksPort: number;
 	netPort: number;
+	assignedPort?: number;
 }
 
 export class RCONWidget extends Widget
@@ -342,7 +344,7 @@ export class RCONWidget extends Widget
 
 
 const LOCAL_SETTINGS: Record<string, Record<string, SettingConfig>> = {
-	terminal: {
+	rcon: {
 		masterServers: {
 			key: 'masters_list',
 			default: [],
