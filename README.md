@@ -138,3 +138,4 @@ This platform merges two core server components into a zero-install cloud arcade
 * [ ] **Worker Offscreen Renderer Stream:** Add headless WebGPU rendering inside an isolated background worker that streams video to secondary devices without rendering to the local main screen.
 * [ ] **In-Browser OBS Studio:** Finalize the worker-based OBS live streaming engine for capturing desktop, browser tab, game, and webcam feeds, encoding via FFmpeg WASM, and piping to egress streams.
 
+* [ ] Start registering my apps as q3 servers and when somebody connects, start the game server on the spot as if it was always there.

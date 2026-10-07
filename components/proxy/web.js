@@ -853,7 +853,7 @@ if(runServer)
 			}
 		});
 
-	let socks = new Server({ forwardIP });
+	let socks = new Server({ proxy: forwardIP });
 	let httpServer = http.createServer(app);
 
 	// Catch low-level HTTP server errors (e.g. EADDRINUSE)

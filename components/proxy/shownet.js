@@ -1,3 +1,5 @@
+/// <reference types="node" />
+// @ts-check
 
 /**
  * Utility to format binary stream into safe printable ASCII.

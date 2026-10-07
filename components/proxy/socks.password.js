@@ -1,3 +1,6 @@
+/// <reference types="node" />
+// @ts-check
+
 var STATE_VERSION = 0,
     // server
     STATE_ULEN = 1,

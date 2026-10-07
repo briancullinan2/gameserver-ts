@@ -191,11 +191,17 @@ export class WebSocketMonitor
 				break;
 
 			case 2:
-				console.log(`[WSMonitor] ${tag} UDP Associated. Performing Emscripten Port Handshake...`);
-				// Step 3: Emscripten Bridge Port Handshake
-				this.sendEmscriptenPortMessage(ws, this.netConfig.netPort);
-				this.updateStatusUI('[WS] Active', 'bx bx-circle-marked');
-				ws.fresh = 3;
+				// SOCKS5 UDP Associate Response (10 bytes: [0x05, 0x00, 0x00, 0x01, IP(4), PORT(2)])
+				if(message.length === 10 && message[0] === 0x05 && message[1] === 0x00)
+				{
+					console.log(`[WSMonitor] ${tag} UDP Associated. Performing Emscripten Port Handshake...`);
+					this.sendEmscriptenPortMessage(ws, this.netConfig.netPort);
+					this.updateStatusUI('[WS] Active', 'bx bx-circle-marked');
+					ws.fresh = 3;
+				} else
+				{
+					console.error(`[WSMonitor] ${tag} SOCKS5 UDP Associate failed:`, message);
+				}
 				break;
 
 			case 3:
@@ -203,28 +209,29 @@ export class WebSocketMonitor
 				{
 					console.log(`[WSMonitor] ${tag} Handshake acknowledged by bridge`);
 					ws.fresh = 4;
-					break;
+					return; // FIX: Return here to prevent fallthrough to case 4/5!
 				}
+				return;
+
 			case 4:
 			case 5:
 				if(message.length <= 10) return;
 
-				// Decode incoming Q3 SOCKS5 packet
 				let addrStr = '';
 				let remotePort = 0;
 				let msgData: Uint8Array;
 
 				if(message[3] === 1)
 				{
-					// IPv4
+					// IPv4 Address
 					addrStr = `${message[4]}.${message[5]}.${message[6]}.${message[7]}`;
-					remotePort = (message[8] << 8) | message[9];
+					remotePort = (message[8] << 8) | message[9]; // Big Endian match
 					msgData = message.slice(10);
 				} else if(message[3] === 3)
 				{
-					// Domain
+					// Domain Name
 					const domainLen = message[4];
-					addrStr = Array.from(message.slice(5, 5 + domainLen - 1))
+					addrStr = Array.from(message.slice(5, 5 + domainLen)) // FIX: Removed '- 1'
 						.map(c => String.fromCharCode(c))
 						.join('');
 
@@ -233,7 +240,7 @@ export class WebSocketMonitor
 					msgData = message.slice(portOffset + 2);
 				} else
 				{
-					console.warn(`[WSMonitor] ${tag} received unsupported address type: ${message[3]}`);
+					console.warn(`[WSMonitor] ${tag} received unsupported ATYP: ${message[3]}`);
 					return;
 				}
 
