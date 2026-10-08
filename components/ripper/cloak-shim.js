@@ -1,5 +1,5 @@
 
-// ts-check
+// @ts-check
 
 /* ======================================================================== */
 /* ANTI-IFRAME-BREAKOUT HARDENING & LOCATION TRAPPING                      */

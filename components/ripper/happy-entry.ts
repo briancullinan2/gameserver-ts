@@ -1,4 +1,4 @@
-// ts-check
+// @ts-check
 
 import * as HappyDOMModule from 'happy-dom-without-node';
 import type * as html2canvasType from "html2canvas";
