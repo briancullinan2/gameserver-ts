@@ -51,7 +51,9 @@ export interface LuminoLayoutWindow
 	isShiftPressed?: boolean;
 	updateModifierPressed?: (e: KeyboardEvent) => void;
 
-	preloadDependencies?(dependenciesToFetch: string[]): Promise<void>
+	fetchAndStore?(baseRoute: string, dependenciesToFetch?: string[]): Promise<[string, boolean]>;
+	fetchTranspileAndStore?(baseRoute: string, dependenciesToFetch?: string[]): Promise<string>;
+	preloadDependencies?(dependenciesToFetch: string[]): Promise<void>;
 	loadScript?: (src: string) => Promise<any>;
 	loadStyle?: (href: string) => Promise<void>;
 	nextTemp?: () => number;

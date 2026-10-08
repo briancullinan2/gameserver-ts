@@ -242,10 +242,15 @@
 	background-color: #1e1e1e;
 }
 
+.sc-preview-canvas,
 .sc-preview-frame {
+	position: absolute;
 	width: 100%;
 	height: 100%;
 	border: none;
 	background-color: #ffffff;
 }
 
+.sc-preview-canvas~.sc-preview-canvas {
+	background-color: transparent;
+}

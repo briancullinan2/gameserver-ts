@@ -14,7 +14,7 @@
 		"build-settings": "npx ts-node -O \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" components/bundle/settings-coalescer.ts",
 		"generate-status": "npx ts-node -O \"{\\\"module\\\":\\\"commonjs\\\",\\\"moduleResolution\\\":\\\"node\\\"}\" components/status/generate.ts",
 		"build": "webpack --config webpack.prod.js",
-		"build-jsdom": "webpack --config webpack.jsdom.js",
+		"build-happydom": "webpack --config webpack.happydom.js",
 		"set-google": "gcloud storage buckets update gs://quake.games --cors-file=cors-json-file.json"
 	},
 	"dependencies": {
@@ -43,6 +43,7 @@
 		"litegraph.js": "^0.7.18",
 		"marked": "^18.0.14",
 		"mime": "^4.1.0",
+		"pdfjs-dist": "^6.4.299",
 		"serve-static": "^2.2.1",
 		"tinymce": "^8.9.2",
 		"turndown": "^7.2.4",

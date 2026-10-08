@@ -1,3 +1,5 @@
+import type { LuminoLayoutWindow } from "../bundle/lumino.d";
+
 export interface IRendererInitOptions
 {
 	workerUrl?: string;
@@ -12,28 +14,112 @@ export interface IPDFExportOptions
 	format?: 'a4' | 'letter';
 }
 
+interface PendingRequest<T = any>
+{
+	resolve: (value: T | PromiseLike<T>) => void;
+	reject: (reason?: any) => void;
+}
+
+const managerSelf: LuminoLayoutWindow = self as unknown as any;
+
 export class VirtualRendererManager
 {
 	private static worker: Worker | null = null;
 	private static isInitialized = false;
 
+	/** Active map tracking pending worker promises by request GUID */
+	private static pendingRequests = new Map<string, PendingRequest>();
+
 	/**
-	 * Initializes the Worker thread, boots JSDOM, and transfers OffscreenCanvas ownership.
+	 * Generates a standard RFC4122 v4 GUID
 	 */
-	public static init(options: IRendererInitOptions): Promise<void>
+	private static generateGUID(): string
 	{
-		return new Promise((resolve, reject) =>
+		if(typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
 		{
-			if(this.worker)
+			return crypto.randomUUID();
+		}
+		return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) =>
+		{
+			const r = (Math.random() * 16) | 0;
+			const v = c === 'x' ? r : (r & 0x3) | 0x8;
+			return v.toString(16);
+		});
+	}
+
+	/**
+	 * Centralized message dispatcher for worker responses
+	 */
+	private static handleWorkerMessage(event: MessageEvent): void
+	{
+		const { type, payload, requestId, error } = event.data || {};
+
+		// Route to registered request promise if a matching requestId exists
+		if(requestId && this.pendingRequests.has(requestId))
+		{
+			const pending = this.pendingRequests.get(requestId)!;
+			this.pendingRequests.delete(requestId);
+
+			if(error)
 			{
-				this.worker.terminate();
+				return pending.reject(new Error(error));
 			}
 
-			const workerPath = options.workerUrl || './virtual-renderer.worker.js';
-			this.worker = new Worker(workerPath);
+			switch(type)
+			{
+				case 'INIT_COMPLETE':
+				case 'RENDER_COMPLETE':
+					this.isInitialized = true;
+					pending.resolve(event.data?.pdf ?? event.data?.bitmap);
+					break;
+
+				case 'INTERACTION_COMPLETE':
+					pending.resolve(payload);
+					break;
+
+				case 'PNG_EXPORTED':
+					{
+						const blob = new Blob([payload.buffer], { type: 'image/png' });
+						pending.resolve(blob);
+					}
+					break;
+
+				case 'PDF_EXPORTED':
+					{
+						const blob = new Blob([payload.buffer], { type: 'application/pdf' });
+						pending.resolve(blob);
+					}
+					break;
+
+				default:
+					pending.resolve(payload);
+					break;
+			}
+		}
+	}
+
+	/**
+	 * Centralized error handler
+	 */
+	private static handleWorkerError(err: ErrorEvent): void
+	{
+		console.error('[VirtualRendererManager] Worker error uncaught:', err);
+		// Reject all active pending requests on a worker crash
+		this.pendingRequests.forEach((pending) => pending.reject(err.error || new Error(err.message)));
+		this.pendingRequests.clear();
+	}
+
+	/**
+	 * Initializes the Worker thread, boots Virtual DOM, and transfers OffscreenCanvas ownership.
+	 */
+	public static init(options: IRendererInitOptions): Promise<ImageBitmap | Buffer>
+	{
+		return new Promise(async (resolve, reject) =>
+		{
+			const requestId = this.generateGUID();
+			const transferables: Transferable[] = [];
 
 			let offscreenCanvas: OffscreenCanvas | undefined = undefined;
-			const transferables: Transferable[] = [];
 
 			if(options.canvasEl)
 			{
@@ -41,24 +127,30 @@ export class VirtualRendererManager
 				transferables.push(offscreenCanvas);
 			}
 
-			this.worker.onmessage = (event: MessageEvent) =>
+			if(!this.worker)
 			{
-				const { type } = event.data;
-				if(type === 'RENDER_COMPLETE')
+				try
 				{
-					this.isInitialized = true;
-					resolve();
-				}
-			};
+					await managerSelf.fetchAndStore?.('/components/ripper/html-worker.js');
+					const workerPath = options.workerUrl || '/base/components/ripper/html-worker.js';
+					this.worker = new Worker(workerPath + '?t=' + Date.now() + '&local-csp=true');
 
-			this.worker.onerror = (err) =>
-			{
-				reject(err);
-			};
+					this.worker.onmessage = (e) => this.handleWorkerMessage(e);
+					this.worker.onerror = (e) => this.handleWorkerError(e);
+				}
+				catch(err)
+				{
+					return reject(err);
+				}
+			}
+
+			// Register request promise with GUID
+			this.pendingRequests.set(requestId, { resolve, reject });
 
 			this.worker.postMessage(
 				{
 					type: 'INIT',
+					requestId,
 					payload: {
 						html: options.html,
 						url: options.targetUrl || 'https://virtual.local/',
@@ -71,7 +163,7 @@ export class VirtualRendererManager
 	}
 
 	/**
-	 * Sends a coordinate click interaction to the worker's JSDOM tree.
+	 * Sends a coordinate click interaction to the worker's DOM tree.
 	 */
 	public static sendClick(x: number, y: number): Promise<{ targetTag: string; }>
 	{
@@ -82,18 +174,12 @@ export class VirtualRendererManager
 				return reject(new Error('VirtualRendererManager is not initialized.'));
 			}
 
-			const handleResponse = (event: MessageEvent) =>
-			{
-				if(event.data.type === 'INTERACTION_COMPLETE')
-				{
-					this.worker?.removeEventListener('message', handleResponse);
-					resolve(event.data.payload);
-				}
-			};
+			const requestId = this.generateGUID();
+			this.pendingRequests.set(requestId, { resolve, reject });
 
-			this.worker.addEventListener('message', handleResponse);
 			this.worker.postMessage({
 				type: 'CLICK_INTERACTION',
+				requestId,
 				payload: { x, y }
 			});
 		});
@@ -111,18 +197,13 @@ export class VirtualRendererManager
 				return reject(new Error('VirtualRendererManager is not initialized.'));
 			}
 
-			const handleResponse = (event: MessageEvent) =>
-			{
-				if(event.data.type === 'PNG_EXPORTED')
-				{
-					this.worker?.removeEventListener('message', handleResponse);
-					const blob = new Blob([event.data.payload.buffer], { type: 'image/png' });
-					resolve(blob);
-				}
-			};
+			const requestId = this.generateGUID();
+			this.pendingRequests.set(requestId, { resolve, reject });
 
-			this.worker.addEventListener('message', handleResponse);
-			this.worker.postMessage({ type: 'EXPORT_PNG' });
+			this.worker.postMessage({
+				type: 'EXPORT_PNG',
+				requestId
+			});
 		});
 	}
 
@@ -138,26 +219,19 @@ export class VirtualRendererManager
 				return reject(new Error('VirtualRendererManager is not initialized.'));
 			}
 
-			const handleResponse = (event: MessageEvent) =>
-			{
-				if(event.data.type === 'PDF_EXPORTED')
-				{
-					this.worker?.removeEventListener('message', handleResponse);
-					const blob = new Blob([event.data.payload.buffer], { type: 'application/pdf' });
-					resolve(blob);
-				}
-			};
+			const requestId = this.generateGUID();
+			this.pendingRequests.set(requestId, { resolve, reject });
 
-			this.worker.addEventListener('message', handleResponse);
 			this.worker.postMessage({
 				type: 'EXPORT_PDF',
+				requestId,
 				payload: { options }
 			});
 		});
 	}
 
 	/**
-	 * Terminates the active worker instance.
+	 * Terminates the active worker instance and rejects all open requests.
 	 */
 	public static dispose(): void
 	{
@@ -166,6 +240,9 @@ export class VirtualRendererManager
 			this.worker.terminate();
 			this.worker = null;
 			this.isInitialized = false;
+
+			this.pendingRequests.forEach((pending) => pending.reject(new Error('Worker disposed.')));
+			this.pendingRequests.clear();
 		}
 	}
 }

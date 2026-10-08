@@ -4,6 +4,9 @@
 /* 0. SAFE DEPENDENCY IMPORTING WITH ISOLATED ERROR HANDLING                */
 /* ======================================================================== */
 
+/** @type {Worker & GlobalWorkerScope} */
+const workerSelf = /** @type {any} */ (self);
+
 /**
  * Safely load a script dependency without throwing unhandled exceptions.
  * @param {string} scriptPath
@@ -23,9 +26,9 @@ function safeImportScript(scriptPath)
 }
 
 // Individually import dependencies so one failure doesn't halt execution
-const hasHappyDOM = safeImportScript('./happy-dom.js') || safeImportScript('https://cdn.jsdelivr.net/npm/happy-dom@13.3.0/dist/happy-dom.js');
-const hasJSDOM = safeImportScript('./jsdom.bundle.js') || safeImportScript('https://cdn.jsdelivr.net/npm/jsdom@24.0.0/lib/jsdom.js');
-const hasJSPDF = safeImportScript('./jspdf.umd.min.js') || safeImportScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+const hasHappyDOM = safeImportScript('/components/ripper/happydom.bundle.js?t=' + Date.now()) || safeImportScript('https://cdn.jsdelivr.net/npm/happy-dom@13.3.0/dist/happy-dom.js');
+const hasJSDOM = safeImportScript('/components/ripper/jsdom.bundle.js?t=' + Date.now()) || safeImportScript('https://cdn.jsdelivr.net/npm/jsdom@24.0.0/lib/jsdom.js');
+const hasJSPDF = safeImportScript('/components/ripper/jspdf.umd.min.js?t=' + Date.now()) || safeImportScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
 
 /* ======================================================================== */
 /* TYPE DEFINITIONS                                                         */
@@ -73,15 +76,13 @@ const hasJSPDF = safeImportScript('./jspdf.umd.min.js') || safeImportScript('htt
 
 /**
  * @typedef {Object} GlobalWorkerScope
- * @property {any} [HappyDOM]
+ * @property {import('happy-dom')} [HappyDOM]
+ * @property {import('happy-dom').Window} [Window]
  * @property {typeof import('jsdom')} [jsdom]
  * @property {{ jsPDF: new (options?: IPDFOptions) => JSPDFInstance }} [jspdf]
  * @property {(message: any, transferables?: Transferable[]) => void} postMessage
  * @property {(event: MessageEvent<IncomingWorkerMessage>) => Promise<void> | void} onmessage
  */
-
-/** @type {Worker & GlobalWorkerScope} */
-const workerSelf = /** @type {any} */ (self);
 
 /* ======================================================================== */
 /* STATE VARIABLES                                                          */
@@ -90,7 +91,7 @@ const workerSelf = /** @type {any} */ (self);
 /** @type {any | null} */
 let activeWindow = null;
 
-/** @type {Document | undefined | null} */
+/** @type {import('happy-dom').Document | undefined | null} */
 let activeDocument = null;
 
 /** @type {OffscreenCanvas | undefined | null} */
@@ -122,7 +123,12 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 	{
 		try
 		{
-			const happyWindow = new workerSelf.HappyDOM.Window({
+			if(typeof workerSelf.Window !== 'function')
+			{
+				throw new Error('HappyDOM Window constructor is not a valid class/function');
+			}
+
+			const happyWindow = new /** @type {new(opt: any) => import('happy-dom').Window} */(workerSelf.Window)({
 				url: url,
 				settings: {
 					disableJavaScriptEvaluation: false,
@@ -132,10 +138,12 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 
 			activeWindow = happyWindow;
 			activeDocument = happyWindow.document;
+
 			if(activeDocument)
 			{
 				activeDocument.write(html);
 			}
+
 			activeEngine = 'happy-dom';
 			initialized = true;
 		} catch(err)
@@ -196,7 +204,8 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 		const el = origCreateCanvas(tagName, options);
 		if(tagName.toLowerCase() === 'canvas')
 		{
-			const canvas = /** @type {HTMLCanvasElement} */ (el);
+			/** @type {HTMLCanvasElement} */
+			const canvas = /** @type {any} */(el);
 			const internalCanvas = new OffscreenCanvas(300, 150);
 
 			/**
@@ -217,7 +226,7 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 
 /**
  * Renders the virtual DOM elements into the transferred OffscreenCanvas
- * @returns {Promise<void>}
+ * @returns {Promise<ImageBitmap | ArrayBuffer | undefined>}
  */
 async function renderToCanvas()
 {
@@ -250,8 +259,10 @@ async function renderToCanvas()
 		const imageBitmap = await createImageBitmap(blob);
 		canvasCtx.drawImage(imageBitmap, 0, 0);
 		URL.revokeObjectURL(url);
+		return imageBitmap;
 	} catch(err)
 	{
+		console.error(err);
 		// Fallback text rendering if foreignObject SVG parsing fails or is restricted
 		canvasCtx.fillStyle = '#333333';
 		canvasCtx.font = '16px sans-serif';
@@ -291,7 +302,7 @@ async function generatePDF(options = {})
 
 workerSelf.onmessage = async (event) =>
 {
-	const { type, payload } = event.data;
+	const { type, requestId, payload } = event.data;
 
 	switch(type)
 	{
@@ -303,13 +314,21 @@ workerSelf.onmessage = async (event) =>
 				canvasCtx = offscreenCanvas?.getContext('2d');
 			}
 			createVirtualDOM(html, url, engine);
-			await renderToCanvas();
-			workerSelf.postMessage({ type: 'RENDER_COMPLETE', payload: { engine: activeEngine } });
+			const bitmap = await renderToCanvas();
+			let pdf;
+			if(!bitmap)
+			{
+				pdf = await generatePDF();
+			}
+
+			workerSelf.postMessage(pdf
+				? { requestId, type: 'RENDER_COMPLETE', pdf: pdf }
+				: { requestId, type: 'RENDER_COMPLETE', bitmap: bitmap });
 			break;
 		}
 
 		case 'CLICK_INTERACTION': {
-			const { x, y } = payload;
+			const { requestId, x, y } = payload;
 			if(!activeDocument || !activeWindow) return;
 
 			// Resolve element at coordinate or default to body
@@ -338,10 +357,18 @@ workerSelf.onmessage = async (event) =>
 				}
 			}
 
-			await renderToCanvas();
+			const bitmap = await renderToCanvas();
+			let pdf;
+			if(!bitmap)
+			{
+				pdf = await generatePDF();
+			}
 			workerSelf.postMessage({
 				type: 'INTERACTION_COMPLETE',
-				payload: { targetTag: targetEl ? targetEl.tagName : 'NONE', engine: activeEngine }
+				requestId,
+				payload: pdf
+					? { targetTag: targetEl ? targetEl.tagName : 'NONE', pdf: pdf }
+					: { targetTag: targetEl ? targetEl.tagName : 'NONE', bitmap: bitmap }
 			});
 			break;
 		}
