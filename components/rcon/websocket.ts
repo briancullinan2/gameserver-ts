@@ -32,6 +32,8 @@ export class WebSocketMonitor
 
 	private static _serverResponse: Signal<any, ISocketMessage> = new Signal<any, ISocketMessage>(this);
 	public static previousError?: Date;
+	static queue: any = [];
+	static queueFrame: NodeJS.Timeout;
 
 	public static get serverResponse(): ISignal<any, ISocketMessage>
 	{
@@ -95,6 +97,7 @@ export class WebSocketMonitor
 			{
 				console.log('[WSMonitor] Starting 9s heartbeat interval timer');
 				this.heartbeatTimer = setInterval(() => this.sendHeartbeats(), 9000);
+				this.queueFrame = setInterval(() => this.clearFrameQueue(), 15);
 			}
 
 			// Update UI status item
@@ -112,6 +115,27 @@ export class WebSocketMonitor
 			console.error('[WSMonitor] Failed to initialize SOCKS5 WebSockets:', err);
 		}
 	}
+
+
+	private static clearFrameQueue()
+	{
+		const socketsWorking = (this.socket1 && this.socket1.readyState === WebSocket.OPEN && (this.socket1 as any).fresh >= 3)
+			|| (this.socket2 && this.socket2.readyState === WebSocket.OPEN && (this.socket2 as any).fresh >= 3);
+
+		if(!socketsWorking)
+		{
+			return;
+		}
+
+		const oldQueue = this.queue;
+		this.queue = [];
+
+		for(const msgArgs of oldQueue ?? [])
+		{
+			this.sendQ3UDPMessage.apply(this, msgArgs);
+		}
+	}
+
 
 	private static onSocketError(evt: Event): void
 	{
@@ -169,7 +193,14 @@ export class WebSocketMonitor
 		const ws = evt.target as any;
 		const tag = ws === this.socket1 ? 'socket1' : ws === this.socket2 ? 'socket2' : 'unknown';
 
-		if(typeof evt.data === 'string') return;
+		if(typeof evt.data === 'string')
+		{
+			debugger;
+			return;
+		} else
+		{
+
+		}
 		const message = new Uint8Array(evt.data);
 
 		switch(ws.fresh)
@@ -263,19 +294,33 @@ export class WebSocketMonitor
 	}
 
 
-	public static sendQ3UDPMessage(targetAddr: string, port: number, payload: string): void
+
+	public static sendHTTPRequest(targetAddr: string, port: number, payload: string)
+	{
+		return this.sendQ3UDPMessage(targetAddr, port, payload, true, 0x05);
+	}
+
+
+	public static sendQ3UDPMessage(targetAddr: string, port: number, payload: string, stripOOB?: boolean, type?: number): void
 	{
 		const payloadBytes = new TextEncoder().encode(payload);
 		const header = new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF]);
-		const fullPayload = new Uint8Array(header.length + payloadBytes.length);
-		fullPayload.set(header, 0);
-		fullPayload.set(payloadBytes, 4);
+		const fullPayload = new Uint8Array(
+			(stripOOB !== true ? header.length : 0) + payloadBytes.length);
+		if(stripOOB !== true)
+		{
+			fullPayload.set(header, 0);
+			fullPayload.set(payloadBytes, 4);
+		} else
+		{
+			fullPayload.set(payloadBytes, 0);
+		}
 
 		// Frame SOCKS5 UDP Packet
 		const nameLen = targetAddr.length;
 		const packet = new Uint8Array(4 + 1 + nameLen + 2 + fullPayload.length);
 		packet[0] = 0x00;
-		packet[1] = 0x00;
+		packet[1] = type ?? 0x00;
 		packet[2] = 0x00;
 		packet[3] = 0x03; // Domain name addressing
 		packet[4] = nameLen;
@@ -284,14 +329,20 @@ export class WebSocketMonitor
 		packet[5 + nameLen + 1] = port & 0xFF;
 		packet.set(fullPayload, 5 + nameLen + 2);
 
+		let any = false;
 		if(this.socket1 && this.socket1.readyState === WebSocket.OPEN && (this.socket1 as any).fresh >= 3)
 		{
 			this.socket1.send(packet);
-		} else if(this.socket2 && this.socket2.readyState === WebSocket.OPEN && (this.socket2 as any).fresh >= 3)
+			any = true;
+		}
+		if(this.socket2 && this.socket2.readyState === WebSocket.OPEN && (this.socket2 as any).fresh >= 3)
 		{
 			this.socket2.send(packet);
-		} else
+			any = true;
+		}
+		if(!any)
 		{
+			this.queue.push([targetAddr, port, payload, stripOOB, type]);
 			console.warn('[WSMonitor] No active socket ready to send packet. Attempting reconnect...');
 			this.initQ3Socks5Networking();
 		}

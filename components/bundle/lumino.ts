@@ -8,7 +8,7 @@ import * as widgets from '@lumino/widgets';
 import * as messaging from '@lumino/messaging';
 import * as datagrid from '@lumino/datagrid';
 import * as signaling from '@lumino/signaling';
-import { createTopBar, initializeMenus, MODULE_REGISTRY, renderHashCommand, TERMINAL_REGISTRY, triggerPanelRoute } from './menu';
+import { createTopBar, initializeMenus, MODULE_REGISTRY, renderHashCommand, TERMINAL_REGISTRY, TOOLS_REGISTRY, triggerPanelRoute } from './menu';
 import { StatusBarWidget } from './status';
 import { ServiceWorkerManager } from './worker';
 import { SettingConfig, SettingsManager } from './settings';
@@ -214,7 +214,10 @@ function main(): void
 
 		// TODO: load default editor specified in localStorage
 		const userWorkspaceChoice = SettingsManager.get('core', 'workspaceDefault');
-		if(Array.from(mainDock.widgets()).length === 0 && MODULE_REGISTRY[userWorkspaceChoice])
+		if(Array.from(mainDock.widgets()).length === 0
+			&& (MODULE_REGISTRY[userWorkspaceChoice]
+				|| TOOLS_REGISTRY[userWorkspaceChoice])
+		)
 		{
 			await triggerPanelRoute(userWorkspaceChoice, mainDock, true);
 		}

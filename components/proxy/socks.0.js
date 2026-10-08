@@ -82,6 +82,10 @@ async function proxyCommand(socket, reqInfo, onData)
 			const { proxyWSCommand } = require('./socks.4.js');
 			await proxyWSCommand.call(this, socket, reqInfo, onData);
 			break;
+		case 0x05: // HTTP/HTTPS BRIDGE
+			const { proxyHTTPCommand } = require('./socks.5.js');
+			await proxyHTTPCommand.call(this, socket, reqInfo, onData);
+			break;
 		default:
 			console.warn(`Unknown or unsupported command code: ${reqInfo.cmd}`);
 			break;
@@ -172,27 +176,36 @@ function _onUDPMessage(udpLookupPort, isWebSocket, message, rinfo)
 
 	const returnIP = false;
 	const rawAddr = rinfo.address || '127.0.0.1';
-	const ipv6 = ip6addr.parse(rawAddr);
-	let localbytes = ipv6.toBuffer();
-
-	// Strip IPv4-mapped IPv6 prefix (::ffff:)
-	if(ipv6.kind() === 'ipv4')
-	{
-		localbytes = localbytes.slice(12);
-	}
 
 	// Check DNS cache for reverse domain mapping
 	let domain = Object.keys(this._dnsLookup).find(
 		(n) => this._dnsLookup[n] === rawAddr
-	);
+			|| n === rawAddr
+	) ?? rinfo.address;
+	//console.log('Goddamnit', this._dnsLookup, domain);
+	let localbytes;
+	const socketAddr = domain ? this._dnsLookup[domain] : rawAddr ?? rawAddr;
+	try
+	{
+		const ipv6 = ip6addr.parse(socketAddr);
+		localbytes = ipv6.toBuffer();
+		if(ipv6.kind() === 'ipv4')
+		{
+			localbytes = localbytes.slice(12);
+		}
+	} catch(e)
+	{
+		console.error('Could not parse ' + socketAddr, e);
+	}
 
+	// Strip IPv4-mapped IPv6 prefix (::ffff:)
 	if(domain && isWebSocket)
 	{
 		domain = `ws://${domain}`;
 	}
 
-	const isRawIP = returnIP || !domain;
-	const bufLength = isRawIP || !domain
+	const isRawIP = localbytes;
+	const bufLength = (isRawIP && !domain) && localbytes
 		? 4 + localbytes.length + 2
 		: 4 + 1 + domain.length + 2;
 
@@ -203,9 +216,9 @@ function _onUDPMessage(udpLookupPort, isWebSocket, message, rinfo)
 	bufrep[1] = 0x00; // Reserved
 	bufrep[2] = 0x00; // Frag sequence (0 = standalone)
 
-	if(isRawIP || !domain)
+	if(localbytes && (isRawIP && !domain))
 	{
-		bufrep[3] = ipv6.kind() === 'ipv4' ? ATYP.IPv4 : ATYP.IPv6;
+		bufrep[3] = localbytes.length === 12 ? ATYP.IPv4 : ATYP.IPv6;
 		for(let i = 0, p = 4; i < localbytes.length; ++i, ++p)
 		{
 			bufrep[p] = localbytes[i];
@@ -223,10 +236,11 @@ function _onUDPMessage(udpLookupPort, isWebSocket, message, rinfo)
 		bufrep.writeUInt16BE(rinfo.port, portOffset);
 	}
 
-	if(typeof SHOWNET === 'function')
-	{
-		SHOWNET(message, socket, false);
-	}
+	// TODO: only initiate is Q3 messages have gone through
+	// if(typeof SHOWNET === 'function')
+	// {
+	// 	SHOWNET(message, socket, false);
+	// }
 
 	// Construct final output payload
 	const isHandshakeOnly = message === true;
@@ -236,9 +250,12 @@ function _onUDPMessage(udpLookupPort, isWebSocket, message, rinfo)
 
 	if(typeof socket.send === 'function')
 	{
-		socket.send(payload, { binary: true });
+		/** @type {ExtendedSocket} */ (socket).send(payload, { binary: true });
 	}
-
+	else if('write' in socket && typeof socket.write === 'function')
+	{
+		/** @type {any} */ (socket).write(payload);
+	}
 	this._timeouts[udpLookupPort] = Date.now();
 }
 

@@ -224,3 +224,28 @@
 	height: 100%;
 	width: 100%;
 }
+
+
+.sc-mini-browser {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	width: 100%;
+	overflow: hidden;
+}
+
+.sc-viewport-wrapper {
+	flex: 1;
+	position: relative;
+	width: 100%;
+	height: 100%;
+	background-color: #1e1e1e;
+}
+
+.sc-preview-frame {
+	width: 100%;
+	height: 100%;
+	border: none;
+	background-color: #ffffff;
+}
+

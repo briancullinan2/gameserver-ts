@@ -774,9 +774,9 @@ if(runServer)
 	const express = require('express');
 	const app = express();
 	const http = require('http');
-	//const master = require('./master.js');
+	const master = require('./master.js');
 
-	//master(masterPort);
+	master(masterPort);
 
 	app.enable('etag');
 	app.set('etag', 'strong');

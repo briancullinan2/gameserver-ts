@@ -232,6 +232,13 @@ class Parser extends EventEmitter
 
 			switch(state)
 			{
+				/*
+					+----+----------+----------+----------+
+					|VER | NMETHODS | METHODS  | CMD      |
+					+----+----------+----------+----------+
+					| 1  |    1     | 1 to 255 | 1 - 8    |
+					+----+----------+----------+----------+
+				*/
 				case STATE_VERSION:
 					if(this._buffer[i] !== 0x05)
 					{
@@ -309,7 +316,7 @@ class Parser extends EventEmitter
 					_cmd = cmd || CMD.CONNECT;
 
 					// Support extended protocol ranges (CONNECT, BIND, UDP, WS, HTTP, DNS, PING, SUBNET)
-					if(cmd < 0x01 || cmd > 0x08)
+					if(cmd < (CMD.CONNECT ?? 0x01) || cmd > (CMD.SUBNET_DISCOVERY ?? 0x08))
 					{
 						const rawSlice = this._buffer.subarray(Math.max(0, i - 2), Math.min(len, i + 8));
 						const hexDump = formatHexSequence(rawSlice);

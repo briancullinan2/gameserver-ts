@@ -139,3 +139,6 @@ This platform merges two core server components into a zero-install cloud arcade
 * [ ] **In-Browser OBS Studio:** Finalize the worker-based OBS live streaming engine for capturing desktop, browser tab, game, and webcam feeds, encoding via FFmpeg WASM, and piping to egress streams.
 
 * [ ] Start registering my apps as q3 servers and when somebody connects, start the game server on the spot as if it was always there.
+
+
+![alt text](<Screenshot 2026-10-06 120734.png>) ![alt text](<Screenshot 2026-10-07 182604.png>)

@@ -1,92 +1,53 @@
-// @ts-check
+import { Socket } from 'node:net';
+import { Duplex } from 'node:stream';
 
-/**
- * @file user_password_auth.js
- * @description SOCKS5 Subnegotiation Username/Password Authentication Handler (RFC 1929) for Node.js
- */
+export type AuthCallback = (
+	user: string,
+	pass: string,
+	done: (success: boolean) => void
+) => void;
 
-const { Duplex } = require('node:stream');
+export type ServerCompletionCallback = (errOrSuccess: Error | boolean) => void;
+export type ClientCompletionCallback = (success: boolean | Error) => void;
 
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
+enum ServerState
+{
+	VERSION = 0,
+	ULEN = 1,
+	UNAME = 2,
+	PLEN = 3,
+	PASSWD = 4,
+}
 
-/**
- * Server callback for verifying credentials.
- * @callback AuthCallback
- * @param {string} user Decoded username string.
- * @param {string} pass Decoded password string.
- * @param {(success: boolean) => void} done Callback function to indicate whether authentication succeeded.
- * @returns {void}
- */
-
-/**
- * Completion callback for the server handler.
- * @callback ServerCompletionCallback
- * @param {Error | boolean} errOrSuccess Error instance on failure, or boolean status.
- * @returns {void}
- */
-
-/**
- * Completion callback for the client handler.
- * @callback ClientCompletionCallback
- * @param {boolean | Error} success True if server accepted credentials, false/Error otherwise.
- * @returns {void}
- */
-
-// ============================================================================
-// ENUMS & CONSTANTS
-// ============================================================================
-
-/** @enum {number} */
-const ServerState = Object.freeze({
-	VERSION: 0,
-	ULEN: 1,
-	UNAME: 2,
-	PLEN: 3,
-	PASSWD: 4
-});
-
-/** @enum {number} */
-const ClientState = Object.freeze({
-	VERSION: 0,
-	STATUS: 1
-});
+enum ClientState
+{
+	VERSION = 0,
+	STATUS = 1,
+}
 
 const BUF_SUCCESS = Buffer.from([0x01, 0x00]);
 const BUF_FAILURE = Buffer.from([0x01, 0x01]);
 
-// ============================================================================
-// CLASS IMPLEMENTATION
-// ============================================================================
-
-class UserPasswordAuthHandler
+export class UserPasswordAuthHandler
 {
+	public readonly METHOD = 0x02;
+
+	private authCallback?: AuthCallback;
+	private username?: string;
+	private password?: string;
+	private userLen: number = 0;
+	private passLen: number = 0;
+
 	/**
-	 * Constructs a SOCKS5 User/Password Auth Handler instance.
-	 * @param {AuthCallback | string} authCbOrUser AuthCallback function (for server mode) or username string (for client mode).
-	 * @param {string} [password] Password string (required for client mode).
+	 * Initialize for Server mode with an authentication callback
 	 */
-	constructor(authCbOrUser, password)
+	constructor(authCallback: AuthCallback);
+	/**
+	 * Initialize for Client mode with username and password
+	 */
+	constructor(username: string, password: string);
+	constructor(authCbOrUser: AuthCallback | string, password?: string)
 	{
-		/** @type {number} */
-		this.METHOD = 0x02;
-
-		/** @type {AuthCallback | undefined} */
-		this.authCallback = undefined;
-
-		/** @type {string | undefined} */
-		this.username = undefined;
-
-		/** @type {string | undefined} */
-		this.password = undefined;
-
-		/** @type {number} */
-		this.userLen = 0;
-
-		/** @type {number} */
-		this.passLen = 0;
-
 		if(typeof authCbOrUser === 'function')
 		{
 			this.authCallback = authCbOrUser;
@@ -112,30 +73,23 @@ class UserPasswordAuthHandler
 	}
 
 	/**
-	 * Handles SOCKS5 Subnegotiation Username/Password Auth on the Server (RFC 1929)
-	 * @param {Duplex} stream Inbound client stream socket.
-	 * @param {ServerCompletionCallback} cb Callback invoked upon subnegotiation finish.
-	 * @returns {void}
+	 * Handles SOCKS5 Subnegotiation Username/Password Auth on the Server
 	 */
-	server(stream, cb)
+	public server(stream: Duplex, cb: ServerCompletionCallback): void
 	{
 		if(!this.authCallback)
 		{
 			throw new Error('Server handler invoked without an auth callback');
 		}
 
-		/** @type {ServerState} */
 		let state = ServerState.VERSION;
-		let userBuffer = Buffer.alloc(0);
-		let passBuffer = Buffer.alloc(0);
+		let userBuffer: Buffer = Buffer.alloc(0);
+		let passBuffer: Buffer = Buffer.alloc(0);
 		let userPos = 0;
 		let passPos = 0;
 		let usernameStr = '';
 
-		/**
-		 * @param {Buffer} chunk
-		 */
-		const onData = (chunk) =>
+		const onData = (chunk: Buffer) =>
 		{
 			let i = 0;
 			const len = chunk.length;
@@ -227,7 +181,7 @@ class UserPasswordAuthHandler
 								stream.unshift(chunk.subarray(i));
 							}
 
-              /** @type {AuthCallback} */ (this.authCallback)(usernameStr, passwordStr, (success) =>
+							this.authCallback!(usernameStr, passwordStr, (success: boolean) =>
 							{
 								if(stream.writable)
 								{
@@ -247,25 +201,18 @@ class UserPasswordAuthHandler
 	}
 
 	/**
-	 * Handles SOCKS5 Subnegotiation Username/Password Auth on the Client (RFC 1929)
-	 * @param {Duplex} stream Outbound server stream socket.
-	 * @param {ClientCompletionCallback} cb Callback invoked with auth result.
-	 * @returns {void}
+	 * Handles SOCKS5 Subnegotiation Username/Password Auth on the Client
 	 */
-	client(stream, cb)
+	public client(stream: Duplex, cb: ClientCompletionCallback): void
 	{
 		if(this.username === undefined || this.password === undefined)
 		{
 			throw new Error('Client handler invoked without credentials');
 		}
 
-		/** @type {ClientState} */
 		let state = ClientState.VERSION;
 
-		/**
-		 * @param {Buffer} chunk
-		 */
-		const onData = (chunk) =>
+		const onData = (chunk: Buffer) =>
 		{
 			let i = 0;
 			const len = chunk.length;
@@ -323,21 +270,14 @@ class UserPasswordAuthHandler
 	}
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
-/**
- * Factory function export for backward compatibility with traditional function signatures.
- * @param {AuthCallback | string} authCbOrUser
- * @param {string} [password]
- * @returns {UserPasswordAuthHandler}
- */
-function UserPasswordAuthHandlers(authCbOrUser, password)
+// Factory function export for backward compatibility with existing codebase
+export default function UserPasswordAuthHandlers(
+	authCallbackOrUser: AuthCallback | string,
+	password?: string
+)
 {
-	return new UserPasswordAuthHandler(authCbOrUser, password);
+	return new UserPasswordAuthHandler(
+		authCallbackOrUser as any,
+		password as any
+	);
 }
-
-UserPasswordAuthHandlers.UserPasswordAuthHandler = UserPasswordAuthHandler;
-
-module.exports = UserPasswordAuthHandlers;

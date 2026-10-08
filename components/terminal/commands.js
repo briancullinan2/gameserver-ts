@@ -446,7 +446,9 @@ async function loadCommand(argv, database, commandName)
 		{
 			await commandSelf.loadScript?.(src);
 		}
-	} else if(!commandSelf.MODULE_REGISTRY?.[moduleToLoad])
+	} else if(!commandSelf.MODULE_REGISTRY?.[moduleToLoad]
+		&& !commandSelf.TOOLS_REGISTRY?.[moduleToLoad]
+	)
 	{
 		console.log('Invalid module specified: ' + argv[0]);
 		console.log('Valid options:');

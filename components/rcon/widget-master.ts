@@ -176,7 +176,10 @@ export class MasterListWidget extends Widget
 				this.pingServer(server);
 			}
 
-
+			if(server.status === 'online')
+			{
+				MasterListWidget.registerGameServer(server);
+			}
 		}
 		this.renderServerLists();
 	}

@@ -265,7 +265,7 @@ export class GoogleDriveWidget extends FileListWidget implements IErrorEvent, IF
 		const repo = (this.node.querySelector('.filelist-drive') as HTMLSelectElement);
 		const repositories = filelistSelf.settingsManager?.get('filelist', 'googleDriveList');
 		filelistSelf.updateSelectOptions?.(repo, repositories, this._source ? this.defaultRepository : undefined);
-		console.log('Goddamnit', repositories, Array.from(repo.children).map(c => (c as HTMLOptionElement).value + ' - ' + (c as HTMLOptionElement).innerText));
+		//console.log('Goddamnit', repositories, Array.from(repo.children).map(c => (c as HTMLOptionElement).value + ' - ' + (c as HTMLOptionElement).innerText));
 	}
 
 	protected override async initializeFiletrees(): Promise<void>
