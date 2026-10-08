@@ -1,3 +1,108 @@
+
+// ts-check
+
+/* ======================================================================== */
+/* ANTI-IFRAME-BREAKOUT HARDENING & LOCATION TRAPPING                      */
+/* ======================================================================== */
+(function preventFrameBreakout()
+{
+	const realWindow = window;
+
+	// 1. Trap window.top and window.parent Location Access
+	// Creates a fake Location object so `top.location = ...` or `top.location.href = ...` mutates a dummy target
+	const dummyLocation = Object.create(Object.prototype, {
+		href: {
+			get: () => realWindow.location.href,
+			set: (url) =>
+			{
+				console.warn('[AntiBreakout] Intercepted frame breakout attempt to:', url);
+				// Route through your WebSocket proxy or internal navigation handler instead
+				return url;
+			},
+			enumerable: true,
+			configurable: false
+		},
+		replace: {
+			value: function replace(url)
+			{
+				console.warn('[AntiBreakout] Intercepted location.replace breakout attempt to:', url);
+			},
+			writable: false,
+			configurable: false
+		},
+		assign: {
+			value: function assign(url)
+			{
+				console.warn('[AntiBreakout] Intercepted location.assign breakout attempt to:', url);
+			},
+			writable: false,
+			configurable: false
+		}
+	});
+
+	// Proxy Fake Top/Parent Objects
+	const fakeTopWindow = new Proxy(realWindow, {
+		get(target, prop)
+		{
+			if(prop === 'location') return dummyLocation;
+			if(prop === 'top' || prop === 'parent' || prop === 'self') return fakeTopWindow;
+			const value = Reflect.get(target, prop);
+			return typeof value === 'function' ? value.bind(target) : value;
+		},
+		set(target, prop, value)
+		{
+			if(prop === 'location')
+			{
+				dummyLocation.href = value;
+				return true;
+			}
+			return Reflect.set(target, prop, value);
+		}
+	});
+
+	// Override window.top and window.parent getters
+	try
+	{
+		Object.defineProperty(window, 'top', {
+			get: () => fakeTopWindow,
+			set: undefined,
+			configurable: false,
+			enumerable: true
+		});
+		Object.defineProperty(window, 'parent', {
+			get: () => fakeTopWindow,
+			set: undefined,
+			configurable: false,
+			enumerable: true
+		});
+	} catch(e) { }
+
+	// 2. Neutralize target="_top" and target="_parent" Link Breakouts
+	// Captures clicks on <a> or <form> elements attempting to target the top-level window
+	window.addEventListener('click', (event) =>
+	{
+		const targetEl = event.target ? event.target.closest('a, form') : null;
+		if(targetEl)
+		{
+			const targetAttr = targetEl.getAttribute('target');
+			if(targetAttr === '_top' || targetAttr === '_parent')
+			{
+				event.preventDefault();
+				event.stopPropagation();
+
+				const destinationUrl = targetEl.href || targetEl.action;
+				console.warn('[AntiBreakout] Intercepted target="_top" link click to:', destinationUrl);
+
+				// Rewrite navigation internally inside the iframe
+				if(targetEl.tagName.toLowerCase() === 'a' && destinationUrl)
+				{
+					window.location.href = destinationUrl;
+				}
+			}
+		}
+	}, true); // Capture phase execution
+})();
+
 (function ()
 {
 	'use strict';
