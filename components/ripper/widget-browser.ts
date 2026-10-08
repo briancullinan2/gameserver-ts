@@ -133,13 +133,6 @@ export class BrowserWidget extends Widget
 			this.offscreenCanvas = document.createElement('canvas');
 			this.offscreenCanvas.className = 'sc-preview-canvas';
 
-			VirtualRendererManager.init({
-				html: BrowserWidget.LOADING_DOCUMENT.replace('${url}', this.addrInput.value),
-				targetUrl: this.addrInput.value,
-				canvasEl: !this.canvasSent ? this.offscreenCanvas : undefined
-			});
-			this.canvasSent = true;
-
 			this.previewContainer.appendChild(this.offscreenCanvas);
 			this.previewContainer.appendChild(this.previewCanvas);
 		}
@@ -510,6 +503,14 @@ export class BrowserWidget extends Widget
 		// this.openMasters();
 		requestAnimationFrame(() =>
 		{
+
+			VirtualRendererManager.init({
+				html: BrowserWidget.LOADING_DOCUMENT.replace('${url}', this.addrInput.value),
+				targetUrl: this.addrInput.value,
+				canvasEl: !this.canvasSent ? this.offscreenCanvas : undefined
+			});
+			this.canvasSent = true;
+
 			this.navigate();
 		});
 	}

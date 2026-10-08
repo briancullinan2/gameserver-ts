@@ -4,8 +4,14 @@
 /* 0. SAFE DEPENDENCY IMPORTING WITH ISOLATED ERROR HANDLING                */
 /* ======================================================================== */
 
-/** @type {Worker & GlobalWorkerScope} */
+/** @type {Worker & GlobalWorkerScope & HtmlWorkerSelf} */
 const workerSelf = /** @type {any} */ (self);
+
+workerSelf.window = self;
+
+workerSelf.document = {
+
+};
 
 /**
  * Safely load a script dependency without throwing unhandled exceptions.
@@ -35,13 +41,6 @@ const hasJSPDF = safeImportScript('/components/ripper/jspdf.umd.min.js?t=' + Dat
 /* ======================================================================== */
 
 /**
- * @typedef {Object} IPDFOptions
- * @property {'portrait' | 'landscape'} [orientation]
- * @property {'pt' | 'mm' | 'cm' | 'in'} [unit]
- * @property {string | number[]} [format]
- */
-
-/**
  * @typedef {Object} WorkerInitPayload
  * @property {string} html
  * @property {string} [url]
@@ -57,7 +56,7 @@ const hasJSPDF = safeImportScript('/components/ripper/jspdf.umd.min.js?t=' + Dat
 
 /**
  * @typedef {Object} WorkerPDFPayload
- * @property {IPDFOptions} [options]
+ * @property {import('jspdf').jsPDFOptions} [options]
  */
 
 
@@ -68,18 +67,11 @@ const hasJSPDF = safeImportScript('/components/ripper/jspdf.umd.min.js?t=' + Dat
  */
 
 /**
- * @typedef {Object} JSPDFInstance
- * @property {(text: string | string[], x: number, y: number) => void} text
- * @property {(text: string, maxLineWidth: number) => string[]} splitTextToSize
- * @property {(type: 'arraybuffer' | 'blob' | 'datauristring') => ArrayBuffer} output
- */
-
-/**
  * @typedef {Object} GlobalWorkerScope
  * @property {import('happy-dom')} [HappyDOM]
  * @property {import('happy-dom').Window} [Window]
  * @property {typeof import('jsdom')} [jsdom]
- * @property {{ jsPDF: new (options?: IPDFOptions) => JSPDFInstance }} [jspdf]
+ * @property {{ jsPDF: new (options?: import('jspdf').jsPDFOptions) => import('jspdf').jsPDF }} [jspdf]
  * @property {(message: any, transferables?: Transferable[]) => void} postMessage
  * @property {(event: MessageEvent<IncomingWorkerMessage>) => Promise<void> | void} onmessage
  */
@@ -88,24 +80,23 @@ const hasJSPDF = safeImportScript('/components/ripper/jspdf.umd.min.js?t=' + Dat
 /* STATE VARIABLES                                                          */
 /* ======================================================================== */
 
-/** @type {any | null} */
-let activeWindow = null;
+/**
+ * @typedef {Object} HtmlWorkerSelf
+ * @property {import('happy-dom').Window | any | undefined | null | null} [activeWindow]
+ * @property {import('happy-dom').Document | undefined | null} [activeDocument]
+ * @property {OffscreenCanvas | undefined | null} [offscreenCanvas]
+ * @property {OffscreenCanvasRenderingContext2D | undefined | null} [canvasCtx]
+ * @property {'happy-dom' | 'jsdom' | 'none'} [activeEngine]
+ * @property {any | Document} [document]
+ * @property {any | Window} [window]
+ * @property {() => void} [cloneToDocument]
+ */
 
-/** @type {import('happy-dom').Document | undefined | null} */
-let activeDocument = null;
-
-/** @type {OffscreenCanvas | undefined | null} */
-let offscreenCanvas = null;
-
-/** @type {OffscreenCanvasRenderingContext2D | undefined | null} */
-let canvasCtx = null;
-
-/** @type {'happy-dom' | 'jsdom' | 'none'} */
-let activeEngine = 'none';
 
 /* ======================================================================== */
 /* 1. VIRTUAL DOM INITIALIZATION (HAPPY DOM / JSDOM DUAL ENGINE)            */
 /* ======================================================================== */
+
 
 /**
  * Creates and configures a virtual document using Happy DOM (preferred) or JSDOM (fallback).
@@ -117,6 +108,14 @@ let activeEngine = 'none';
 function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine = 'auto')
 {
 	let initialized = false;
+	if(workerSelf.document)
+	{
+		initialized = true;
+		workerSelf.document.open();
+		document.baseURI = url;
+		document.write(html);
+		return;
+	}
 
 	// 1. Try Happy DOM First
 	if((preferredEngine === 'happy-dom' || preferredEngine === 'auto') && workerSelf.HappyDOM)
@@ -136,15 +135,16 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 				}
 			});
 
-			activeWindow = happyWindow;
-			activeDocument = happyWindow.document;
+			workerSelf.activeWindow = happyWindow;
+			workerSelf.activeDocument = happyWindow.document;
+			workerSelf.cloneToDocument?.();
 
-			if(activeDocument)
+			if(workerSelf.activeDocument)
 			{
-				activeDocument.write(html);
+				workerSelf.activeDocument.write(html);
 			}
 
-			activeEngine = 'happy-dom';
+			workerSelf.activeEngine = 'happy-dom';
 			initialized = true;
 		} catch(err)
 		{
@@ -165,9 +165,11 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 				resources: 'usable'
 			});
 
-			activeWindow = dom.window;
-			activeDocument = activeWindow ? activeWindow.document : null;
-			activeEngine = 'jsdom';
+			workerSelf.activeWindow = dom.window;
+			workerSelf.activeDocument = workerSelf.activeWindow ? workerSelf.activeWindow.document : null;
+			workerSelf.cloneToDocument?.();
+
+			workerSelf.activeEngine = 'jsdom';
 			initialized = true;
 		} catch(err)
 		{
@@ -175,31 +177,31 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 		}
 	}
 
-	if(!initialized || !activeWindow || !activeDocument)
+	if(!initialized || !workerSelf.activeWindow || !workerSelf.activeDocument)
 	{
-		activeEngine = 'none';
+		workerSelf.activeEngine = 'none';
 		console.error('[WorkerRenderer] Critical Error: No DOM Engine available to render HTML.');
 		return;
 	}
 
 	// Mask Window Properties against Frame / Worker Detection
-	Object.defineProperty(activeWindow, 'top', { get: () => activeWindow });
-	Object.defineProperty(activeWindow, 'parent', { get: () => activeWindow });
-	Object.defineProperty(activeWindow, 'frameElement', { get: () => null });
+	Object.defineProperty(workerSelf.activeWindow, 'top', { get: () => workerSelf.activeWindow });
+	Object.defineProperty(workerSelf.activeWindow, 'parent', { get: () => workerSelf.activeWindow });
+	Object.defineProperty(workerSelf.activeWindow, 'frameElement', { get: () => null });
 
 	// Mock RequestAnimationFrame APIs
-	activeWindow.requestAnimationFrame = (/** @type {FrameRequestCallback} */ cb) => setTimeout(() => cb(performance.now()), 1000 / 60);
-	activeWindow.cancelAnimationFrame = (/** @type {number} */ id) => clearTimeout(id);
+	workerSelf.activeWindow.requestAnimationFrame = (/** @type {FrameRequestCallback} */ cb) => setTimeout(() => cb(performance.now()), 1000 / 60);
+	workerSelf.activeWindow.cancelAnimationFrame = (/** @type {number} */ id) => clearTimeout(id);
 
 	// Mock Canvas Context for Inline DOM Canvas Elements
-	const origCreateCanvas = activeDocument.createElement.bind(activeDocument);
+	const origCreateCanvas = workerSelf.activeDocument.createElement.bind(workerSelf.activeDocument);
 	/**
 	*
 	* @param {string} tagName
 	* @param {ElementCreationOptions} options
 	* @returns
 	*/
-	activeDocument.createElement = function (tagName, options)
+	workerSelf.activeDocument.createElement = function (tagName, options)
 	{
 		const el = origCreateCanvas(tagName, options);
 		if(tagName.toLowerCase() === 'canvas')
@@ -230,17 +232,17 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
  */
 async function renderToCanvas()
 {
-	if(!offscreenCanvas || !canvasCtx || !activeDocument) return;
+	if(!workerSelf.offscreenCanvas || !workerSelf.canvasCtx || !workerSelf.activeDocument) return;
 
-	const width = offscreenCanvas.width || 800;
-	const height = offscreenCanvas.height || 600;
+	const width = workerSelf.offscreenCanvas.width || 800;
+	const height = workerSelf.offscreenCanvas.height || 600;
 
 	// Clear canvas background
-	canvasCtx.fillStyle = '#ffffff';
-	canvasCtx.fillRect(0, 0, width, height);
+	workerSelf.canvasCtx.fillStyle = '#ffffff';
+	workerSelf.canvasCtx.fillRect(0, 0, width, height);
 
 	// Render SVG foreignObject representation of the virtual HTML
-	const htmlString = activeDocument.documentElement ? activeDocument.documentElement.outerHTML : activeDocument.body.outerHTML;
+	const htmlString = workerSelf.activeDocument.documentElement ? workerSelf.activeDocument.documentElement.outerHTML : workerSelf.activeDocument.body.outerHTML;
 	const svgString = `
     <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
       <foreignObject width="100%" height="100%">
@@ -257,41 +259,324 @@ async function renderToCanvas()
 	try
 	{
 		const imageBitmap = await createImageBitmap(blob);
-		canvasCtx.drawImage(imageBitmap, 0, 0);
+		workerSelf.canvasCtx.drawImage(imageBitmap, 0, 0);
 		URL.revokeObjectURL(url);
 		return imageBitmap;
 	} catch(err)
 	{
 		console.error(err);
 		// Fallback text rendering if foreignObject SVG parsing fails or is restricted
-		canvasCtx.fillStyle = '#333333';
-		canvasCtx.font = '16px sans-serif';
-		canvasCtx.fillText(`Virtual DOM Updated [Engine: ${activeEngine}]`, 20, 40);
+		workerSelf.canvasCtx.fillStyle = '#333333';
+		workerSelf.canvasCtx.font = '16px sans-serif';
+		workerSelf.canvasCtx.fillText(`Virtual DOM Updated [Engine: ${workerSelf.activeEngine}]`, 20, 40);
 	}
 }
 
 /**
  * Generates PDF bytes using jsPDF
- * @param {IPDFOptions} [options]
+ * @param {import('jspdf').jsPDFOptions} [options]
  * @returns {Promise<ArrayBuffer>}
  */
 async function generatePDF(options = {})
 {
-	if(!activeDocument) throw new Error('No Virtual DOM initialized.');
+	if(!workerSelf.activeDocument) throw new Error('No Virtual DOM initialized.');
 	if(!workerSelf.jspdf) throw new Error('jsPDF library is not loaded.');
 
 	const { jsPDF } = workerSelf.jspdf;
 	const doc = new jsPDF({
 		orientation: options.orientation || 'portrait',
 		unit: options.unit || 'pt',
-		format: options.format || 'a4'
+		format: options.format || 'a4',
 	});
 
-	const bodyText = activeDocument.body ? (activeDocument.body.textContent || '') : '';
+	if(workerSelf.activeDocument.body)
+	{
+		const colorReset = workerSelf.activeDocument.createElement('style');
+		colorReset.innerText = `
+* {
+	-webkit-print-color-adjust: exact !important;
+	print-color-adjust: exact !important;
+	color-adjust: exact !important;
+}
 
-	// Format body content into PDF lines
-	const lines = doc.splitTextToSize(bodyText, 500);
-	doc.text(lines, 40, 60);
+/* ==========================================================================
+1. Chrome Base Reset & Web-to-Print Settings
+========================================================================== */
+
+:root {
+  /* Default Web Mode Variables */
+  --bg-color: transparent;
+  --text-color: #202124;
+  --secondary-color: #5f6368;
+  --border-color: #dadce0;
+  --link-color: #1a0dab;
+  --code-bg: #f1f3f4;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* Newsprint Theme Overrides */
+body.theme-newsprint {
+  --bg-color: transparent;
+  --text-color: #1a1a1a;
+  --secondary-color: #4a4a4a;
+  --border-color: #c8c2b0;
+  --link-color: #1a1a1a;
+  --code-bg: #e8e1cf;
+  --font-sans: "Georgia", "Times New Roman", "Times", serif;
+}
+
+/* Box Sizing & Layout Defaults */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  tab-size: 4;
+}
+
+body {
+  margin: 0;
+  padding: 1rem;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+
+  /* FORCE Chrome to keep background colors & graphics when generating PDF */
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  color-adjust: exact !important;
+}
+
+/* Newsprint Column Layout for Main Body Content */
+body.theme-newsprint main,
+body.theme-newsprint article {
+  column-count: 2;
+  column-gap: 20px;
+  column-rule: 1px solid var(--border-color);
+}
+
+/* ==========================================================================
+   2. Typography & Text Elements
+   ========================================================================== */
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  color: var(--text-color);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+h1 { font-size: 2em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+h2 { font-size: 1.5em; }
+h3 { font-size: 1.25em; }
+h4 { font-size: 1em; }
+h5 { font-size: 0.875em; }
+h6 { font-size: 0.85em; color: var(--secondary-color); }
+
+p {
+  margin-top: 0;
+  margin-bottom: 1em;
+}
+
+small {
+  font-size: 80%;
+  color: var(--secondary-color);
+}
+
+b, strong {
+  font-weight: 600;
+}
+
+em, i {
+  font-style: italic;
+}
+
+mark {
+  background-color: #fce8e6;
+  color: var(--text-color);
+  padding: 0.1em 0.2em;
+}
+
+/* ==========================================================================
+   3. Links, Lists, and Blockquotes
+   ========================================================================== */
+
+a {
+  color: var(--link-color);
+  text-decoration: underline;
+  text-decoration-skip-ink: auto;
+}
+
+ul, ol {
+  margin-top: 0;
+  margin-bottom: 1em;
+  padding-left: 2em;
+}
+
+li {
+  margin-bottom: 0.25em;
+}
+
+blockquote {
+  margin: 1em 0;
+  padding: 0.5em 1em;
+  color: var(--secondary-color);
+  border-left: 4px solid var(--border-color);
+  background-color: transparent;
+}
+
+hr {
+  height: 0;
+  margin: 1.5em 0;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+/* ==========================================================================
+   4. Code, Preformatted Text & Media
+   ========================================================================== */
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+code {
+  padding: 0.2em 0.4em;
+  background-color: var(--code-bg);
+  border-radius: 3px;
+}
+
+pre {
+  margin-top: 0;
+  margin-bottom: 1em;
+  padding: 1em;
+  overflow: auto;
+  background-color: var(--code-bg);
+  border-radius: 4px;
+}
+
+pre code {
+  padding: 0;
+  background-color: transparent;
+}
+
+img, svg, video, canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ==========================================================================
+   5. Tables & Forms
+   ========================================================================== */
+
+table {
+  width: 100%;
+  margin-bottom: 1em;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th, td {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+}
+
+th {
+  font-weight: 600;
+  background-color: var(--code-bg);
+}
+
+/* Form controls reset to look native/clean */
+input, button, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  margin: 0;
+}
+
+/* ==========================================================================
+   6. Chrome Print Engine Rules (@page & @media print)
+   ========================================================================== */
+
+@page {
+  /* Chrome default A4 page setup with 1cm margins */
+  size: A4;
+  margin: 10mm;
+}
+
+@media print {
+  body {
+    padding: 0;
+    background-color: var(--bg-color) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Prevent page cuts across elements */
+  p, blockquote, table, pre, figure, img, tr, .no-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Keep headings attached to their following text */
+  h1, h2, h3, h4, h5, h6 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  /* Clean up printed links */
+  a {
+    text-decoration: none;
+  }
+}
+		`;
+
+		//if(activeDocument.body.childNodes.length)
+		//{
+		//activeDocument.body.insertBefore(colorReset, activeDocument.childNodes[0]);
+		//} else
+		{
+			workerSelf.activeDocument.body.appendChild(colorReset);
+		}
+	}
+	const bodyText = workerSelf.activeDocument.body ? (workerSelf.activeDocument.body.textContent || '') : '';
+
+	if(false && workerSelf.activeDocument?.body)
+	{
+		debugger;
+		await doc.html(/** @type {any | HTMLElement}*/(workerSelf.activeDocument.body.children[0]), {
+			callback: function (doc)
+			{
+				//document.body.removeChild(container);
+			},
+			x: 0,
+			y: 0,
+			autoPaging: 'text',
+			html2canvas: {
+				// Chrome's default print background flags
+				backgroundColor: 'transparent',
+				scale: 0.75, // Adjust scale to fit A4 width
+				onclone: (clonedDoc) =>
+				{
+					// Force Chrome print color retention rules on the clone
+					//clonedDoc.body.style.webkitPrintColorAdjust = 'exact';
+					clonedDoc.body.style.printColorAdjust = 'exact';
+				}
+			}
+		});
+	} else
+	{
+		// Format body content into PDF lines
+		const lines = doc.splitTextToSize(bodyText, 500);
+		doc.text(lines, 40, 60);
+	}
 
 	return doc.output('arraybuffer');
 }
@@ -310,8 +595,8 @@ workerSelf.onmessage = async (event) =>
 			const { html, url, canvas, engine } = payload;
 			if(canvas)
 			{
-				offscreenCanvas = canvas;
-				canvasCtx = offscreenCanvas?.getContext('2d');
+				workerSelf.offscreenCanvas = canvas;
+				workerSelf.canvasCtx = workerSelf.offscreenCanvas?.getContext('2d');
 			}
 			createVirtualDOM(html, url, engine);
 			const bitmap = await renderToCanvas();
@@ -329,16 +614,19 @@ workerSelf.onmessage = async (event) =>
 
 		case 'CLICK_INTERACTION': {
 			const { requestId, x, y } = payload;
-			if(!activeDocument || !activeWindow) return;
+			if(!workerSelf.activeDocument || !workerSelf.activeWindow) return;
 
 			// Resolve element at coordinate or default to body
-			const targetEl = /** @type {HTMLElement | null} */ (activeDocument.elementFromPoint ? activeDocument.elementFromPoint(x, y) : null) || activeDocument.body;
+			const targetEl = /** @type {HTMLElement | null} */ (workerSelf.activeDocument.elementFromPoint
+				? workerSelf.activeDocument.elementFromPoint(x, y)
+				: null)
+				|| workerSelf.activeDocument.body;
 
 			if(targetEl)
 			{
 				try
 				{
-					const MouseEventCtor = activeWindow.MouseEvent || MouseEvent;
+					const MouseEventCtor = workerSelf.activeWindow.MouseEvent || MouseEvent;
 					const mouseOverEvent = new MouseEventCtor('mouseover', { clientX: x, clientY: y, bubbles: true });
 					const mouseDownEvent = new MouseEventCtor('mousedown', { clientX: x, clientY: y, bubbles: true });
 					const clickEvent = new MouseEventCtor('click', { clientX: x, clientY: y, bubbles: true });
@@ -374,10 +662,10 @@ workerSelf.onmessage = async (event) =>
 		}
 
 		case 'EXPORT_PNG': {
-			if(!offscreenCanvas) return;
+			if(!workerSelf.offscreenCanvas) return;
 			try
 			{
-				const blob = await offscreenCanvas.convertToBlob({ type: 'image/png' });
+				const blob = await workerSelf.offscreenCanvas.convertToBlob({ type: 'image/png' });
 				const arrayBuffer = await blob.arrayBuffer();
 				workerSelf.postMessage({ type: 'PNG_EXPORTED', payload: { buffer: arrayBuffer } }, [arrayBuffer]);
 			} catch(err)

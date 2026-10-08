@@ -73,6 +73,9 @@ module.exports = {
 		],
 	},
 	plugins: [
+		new webpack.optimize.LimitChunkCountPlugin({
+			maxChunks: 1,
+		}),
 		// new webpack.ProvidePlugin({
 		// 	process: 'process/browser',
 		// 	Buffer: ['buffer', 'Buffer']
@@ -106,6 +109,8 @@ module.exports = {
 		hints: false,
 	},
 	optimization: {
+		splitChunks: false,
+		runtimeChunk: false,
 		minimize: true,
 		minimizer: [
 			new TerserPlugin({

@@ -36,6 +36,7 @@
 		"fabric": "^7.4.0",
 		"happy-dom": "^20.14.5",
 		"happy-dom-without-node": "^14.12.3",
+		"html2canvas": "^1.4.1",
 		"ip6addr": "^0.2.5",
 		"jsdom": "^29.1.1",
 		"jspdf": "^4.2.1",

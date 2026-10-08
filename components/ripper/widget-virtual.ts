@@ -116,6 +116,7 @@ export class VirtualRendererManager
 	{
 		return new Promise(async (resolve, reject) =>
 		{
+			debugger;
 			const requestId = this.generateGUID();
 			const transferables: Transferable[] = [];
 
