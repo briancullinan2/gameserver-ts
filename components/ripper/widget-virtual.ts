@@ -22,7 +22,9 @@ interface PendingRequest<T = any>
 	reject: (reason?: any) => void;
 }
 
-const managerSelf: LuminoLayoutWindow = self as unknown as any;
+const managerSelf: LuminoLayoutWindow & {
+	VirtualRendererManager: typeof VirtualRendererManager;
+} = self as unknown as any;
 
 export class VirtualRendererManager
 {
@@ -57,10 +59,10 @@ export class VirtualRendererManager
 		const { type, payload, requestId, error } = event.data || {};
 
 		// Route to registered request promise if a matching requestId exists
-		if(requestId && this.pendingRequests.has(requestId))
+		if(requestId && managerSelf.VirtualRendererManager.pendingRequests.has(requestId))
 		{
-			const pending = this.pendingRequests.get(requestId)!;
-			this.pendingRequests.delete(requestId);
+			const pending = managerSelf.VirtualRendererManager.pendingRequests.get(requestId)!;
+			managerSelf.VirtualRendererManager.pendingRequests.delete(requestId);
 
 			if(error)
 			{
@@ -71,7 +73,7 @@ export class VirtualRendererManager
 			{
 				case 'INIT_COMPLETE':
 				case 'RENDER_COMPLETE':
-					this.isInitialized = true;
+					managerSelf.VirtualRendererManager.isInitialized = true;
 					pending.resolve(event.data?.pdf ?? event.data?.bitmap);
 					break;
 
@@ -107,8 +109,8 @@ export class VirtualRendererManager
 	{
 		console.error('[VirtualRendererManager] Worker error uncaught:', err);
 		// Reject all active pending requests on a worker crash
-		this.pendingRequests.forEach((pending) => pending.reject(err.error || new Error(err.message)));
-		this.pendingRequests.clear();
+		managerSelf.VirtualRendererManager.pendingRequests.forEach((pending) => pending.reject(err.error || new Error(err.message)));
+		managerSelf.VirtualRendererManager.pendingRequests.clear();
 	}
 
 	/**
@@ -118,7 +120,7 @@ export class VirtualRendererManager
 	{
 		return new Promise(async (resolve, reject) =>
 		{
-			const requestId = this.generateGUID();
+			const requestId = managerSelf.VirtualRendererManager.generateGUID();
 			const transferables: Transferable[] = [];
 
 			let offscreenCanvas: OffscreenCanvas | undefined = undefined;
@@ -129,16 +131,16 @@ export class VirtualRendererManager
 				transferables.push(offscreenCanvas);
 			}
 
-			if(!this.worker)
+			if(!managerSelf.VirtualRendererManager.worker)
 			{
 				try
 				{
 					const workerPath = options.workerUrl || '/components/ripper/html-worker.js';
 					await managerSelf.fetchAndStore?.(workerPath);
-					this.worker = new Worker('/base' + workerPath + '?t=' + Date.now() + '&local-csp=true');
+					managerSelf.VirtualRendererManager.worker = new Worker('/base' + workerPath + '?t=' + Date.now() + '&local-csp=true');
 
-					this.worker.onmessage = (e) => this.handleWorkerMessage(e);
-					this.worker.onerror = (e) => this.handleWorkerError(e);
+					managerSelf.VirtualRendererManager.worker.onmessage = (e) => managerSelf.VirtualRendererManager.handleWorkerMessage(e);
+					managerSelf.VirtualRendererManager.worker.onerror = (e) => managerSelf.VirtualRendererManager.handleWorkerError(e);
 				}
 				catch(err)
 				{
@@ -147,9 +149,9 @@ export class VirtualRendererManager
 			}
 
 			// Register request promise with GUID
-			this.pendingRequests.set(requestId, { resolve, reject });
+			managerSelf.VirtualRendererManager.pendingRequests.set(requestId, { resolve, reject });
 
-			this.worker.postMessage(
+			managerSelf.VirtualRendererManager.worker.postMessage(
 				{
 					type: 'INIT',
 					requestId,
@@ -173,15 +175,15 @@ export class VirtualRendererManager
 	{
 		return new Promise((resolve, reject) =>
 		{
-			if(!this.worker || !this.isInitialized)
+			if(!managerSelf.VirtualRendererManager.worker || !managerSelf.VirtualRendererManager.isInitialized)
 			{
 				return reject(new Error('VirtualRendererManager is not initialized.'));
 			}
 
-			const requestId = this.generateGUID();
-			this.pendingRequests.set(requestId, { resolve, reject });
+			const requestId = managerSelf.VirtualRendererManager.generateGUID();
+			managerSelf.VirtualRendererManager.pendingRequests.set(requestId, { resolve, reject });
 
-			this.worker.postMessage({
+			managerSelf.VirtualRendererManager.worker.postMessage({
 				type: 'CLICK_INTERACTION',
 				requestId,
 				payload: { x, y }
@@ -196,15 +198,15 @@ export class VirtualRendererManager
 	{
 		return new Promise((resolve, reject) =>
 		{
-			if(!this.worker || !this.isInitialized)
+			if(!managerSelf.VirtualRendererManager.worker || !managerSelf.VirtualRendererManager.isInitialized)
 			{
 				return reject(new Error('VirtualRendererManager is not initialized.'));
 			}
 
-			const requestId = this.generateGUID();
-			this.pendingRequests.set(requestId, { resolve, reject });
+			const requestId = managerSelf.VirtualRendererManager.generateGUID();
+			managerSelf.VirtualRendererManager.pendingRequests.set(requestId, { resolve, reject });
 
-			this.worker.postMessage({
+			managerSelf.VirtualRendererManager.worker.postMessage({
 				type: 'EXPORT_PNG',
 				requestId
 			});
@@ -218,15 +220,15 @@ export class VirtualRendererManager
 	{
 		return new Promise((resolve, reject) =>
 		{
-			if(!this.worker || !this.isInitialized)
+			if(!managerSelf.VirtualRendererManager.worker || !managerSelf.VirtualRendererManager.isInitialized)
 			{
 				return reject(new Error('VirtualRendererManager is not initialized.'));
 			}
 
-			const requestId = this.generateGUID();
-			this.pendingRequests.set(requestId, { resolve, reject });
+			const requestId = managerSelf.VirtualRendererManager.generateGUID();
+			managerSelf.VirtualRendererManager.pendingRequests.set(requestId, { resolve, reject });
 
-			this.worker.postMessage({
+			managerSelf.VirtualRendererManager.worker.postMessage({
 				type: 'EXPORT_PDF',
 				requestId,
 				payload: { options }
@@ -239,14 +241,19 @@ export class VirtualRendererManager
 	 */
 	public static dispose(): void
 	{
-		if(this.worker)
+		if(managerSelf.VirtualRendererManager.worker)
 		{
-			this.worker.terminate();
-			this.worker = null;
-			this.isInitialized = false;
+			managerSelf.VirtualRendererManager.worker.terminate();
+			managerSelf.VirtualRendererManager.worker = null;
+			managerSelf.VirtualRendererManager.isInitialized = false;
 
-			this.pendingRequests.forEach((pending) => pending.reject(new Error('Worker disposed.')));
-			this.pendingRequests.clear();
+			managerSelf.VirtualRendererManager.pendingRequests.forEach((pending) => pending.reject(new Error('Worker disposed.')));
+			managerSelf.VirtualRendererManager.pendingRequests.clear();
 		}
 	}
+}
+
+if(!managerSelf.VirtualRendererManager)
+{
+	managerSelf.VirtualRendererManager = VirtualRendererManager;
 }

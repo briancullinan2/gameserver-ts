@@ -4,13 +4,14 @@ import type { LuminoLayoutWindow } from '../bundle/lumino.d';
 import type { GlobalToolbarsWindow, LuminoMenuWindow, RepositorySettingsWindow } from '../bundle/menu.d';
 import type { ISocketMessage, WebSocketMonitor } from '../rcon/websocket';
 import type { SettingConfig } from '../bundle/settings';
-import { VirtualRendererManager } from './widget-virtual';
+import type { VirtualRendererManager } from './widget-virtual';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './pdf.min.mjs';
 import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 
 const widgetSelf: GlobalToolbarsWindow & LuminoLayoutWindow & LuminoMenuWindow
 	& RepositorySettingsWindow & {
+		VirtualRendererManager: typeof VirtualRendererManager,
 		WebSocketMonitor: typeof WebSocketMonitor,
 		pdfjsLib: typeof pdfjsLib;
 	} = self as unknown as any;
@@ -71,7 +72,10 @@ export class BrowserWidget extends Widget
 		this.buildLayout();
 		if(!widgetSelf.WebSocketMonitor)
 		{
-			this.initialize = widgetSelf.preloadDependencies?.(['/components/rcon/websocket.ts'])
+			this.initialize = widgetSelf.preloadDependencies?.([
+				'/components/ripper/widget-virtual.ts',
+				'/components/rcon/websocket.ts',
+			])
 				.then(() =>
 					widgetSelf.WebSocketMonitor.initQ3Socks5Networking()
 				);
@@ -164,81 +168,81 @@ export class BrowserWidget extends Widget
 
 		this.node.appendChild(this.previewContainer);
 
-		this.showLoading(this.addrInput.value);
+		// this.showLoading(this.addrInput.value);
 	}
 
 
 
-	private async showLoading(url?: string): Promise<void>
-	{
-		if(this.previewFrame)
-		{
-			this.previewFrame.src = 'data:text/html;base64,' + btoa(BrowserWidget.LOADING_DOCUMENT.replace('${url}', url ?? ''));
-			return;
-		}
+	// private async showLoading(url?: string): Promise<void>
+	// {
+	// 	if(this.previewFrame)
+	// 	{
+	// 		this.previewFrame.src = 'data:text/html;base64,' + btoa(BrowserWidget.LOADING_DOCUMENT.replace('${url}', url ?? ''));
+	// 		return;
+	// 	}
 
-		if(!this.previewContext) return;
+	// 	if(!this.previewContext) return;
 
-		const rawContent = BrowserWidget.LOADING_DOCUMENT.replace('${url}', url ?? '');
+	// 	const rawContent = BrowserWidget.LOADING_DOCUMENT.replace('${url}', url ?? '');
 
-		// 1. Convert HTML void tags to self-closing XHTML tags for SVG XML compliance
-		const xhtmlContent = rawContent
-			.replace(/<(img|br|hr|input|meta|link)([^>]*?)(?<!\/)>/gi, '<$1$2 />');
+	// 	// 1. Convert HTML void tags to self-closing XHTML tags for SVG XML compliance
+	// 	const xhtmlContent = rawContent
+	// 		.replace(/<(img|br|hr|input|meta|link)([^>]*?)(?<!\/)>/gi, '<$1$2 />');
 
-		// 2. Frame strictly-compliant SVG string
-		const svgString = `
-			<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
-				<foreignObject width="100%" height="100%">
-					<div xmlns="http://www.w3.org/1999/xhtml" style="background:#ffffff; color:#000000; font-family:sans-serif; width:100%; height:100%;">
-						${xhtmlContent}
-					</div>
-				</foreignObject>
-			</svg>
-		`.trim();
+	// 	// 2. Frame strictly-compliant SVG string
+	// 	const svgString = `
+	// 		<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600">
+	// 			<foreignObject width="100%" height="100%">
+	// 				<div xmlns="http://www.w3.org/1999/xhtml" style="background:#ffffff; color:#000000; font-family:sans-serif; width:100%; height:100%;">
+	// 					${xhtmlContent}
+	// 				</div>
+	// 			</foreignObject>
+	// 		</svg>
+	// 	`.trim();
 
-		const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-		const imageUrl = URL.createObjectURL(blob);
+	// 	const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+	// 	const imageUrl = URL.createObjectURL(blob);
 
-		try
-		{
-			// 3. Prefer Image loading pipeline over createImageBitmap(blob) for SVG foreignObject stability
-			const img = new Image();
-			img.src = imageUrl;
+	// 	try
+	// 	{
+	// 		// 3. Prefer Image loading pipeline over createImageBitmap(blob) for SVG foreignObject stability
+	// 		const img = new Image();
+	// 		img.src = imageUrl;
 
-			await new Promise<void>((resolve, reject) =>
-			{
-				img.onload = () => resolve();
-				img.onerror = (e) => reject(new Error('SVG rasterization failed. Check XML compliance or external resource rules.'));
-			});
+	// 		await new Promise<void>((resolve, reject) =>
+	// 		{
+	// 			img.onload = () => resolve();
+	// 			img.onerror = (e) => reject(new Error('SVG rasterization failed. Check XML compliance or external resource rules.'));
+	// 		});
 
-			// Clear canvas background and draw
-			this.previewContext.fillStyle = 'transparent';
-			this.previewContext.fillRect(0, 0, 800, 600);
-			this.previewContext.drawImage(img, 0, 0);
-		}
-		catch(err)
-		{
-			console.error('[BrowserWidget] SVG foreignObject render failed, using Canvas 2D fallback:', err);
+	// 		// Clear canvas background and draw
+	// 		this.previewContext.fillStyle = 'transparent';
+	// 		this.previewContext.fillRect(0, 0, 800, 600);
+	// 		this.previewContext.drawImage(img, 0, 0);
+	// 	}
+	// 	catch(err)
+	// 	{
+	// 		console.error('[BrowserWidget] SVG foreignObject render failed, using Canvas 2D fallback:', err);
 
-			// 4. Clean Canvas Fallback UI
-			this.previewContext.fillStyle = '#181818';
-			this.previewContext.fillRect(0, 0, 800, 600);
+	// 		// 4. Clean Canvas Fallback UI
+	// 		// this.previewContext.fillStyle = '#181818';
+	// 		// this.previewContext.fillRect(0, 0, 800, 600);
 
-			this.previewContext.fillStyle = '#4caf50';
-			this.previewContext.font = 'bold 18px sans-serif';
-			this.previewContext.fillText(`Loading...`, 30, 50);
+	// 		// this.previewContext.fillStyle = '#4caf50';
+	// 		// this.previewContext.font = 'bold 18px sans-serif';
+	// 		// this.previewContext.fillText(`Loading...`, 30, 50);
 
-			this.previewContext.fillStyle = '#aaaaaa';
-			this.previewContext.font = '14px monospace';
-			this.previewContext.fillText(`Target: ${url ?? 'about:blank'}`, 30, 80);
-			this.previewContext.fillText(`Engine: ${this.activeEngine || 'HappyDOM'}`, 30, 105);
-		}
-		finally
-		{
-			// Always revoke object URL to prevent memory leaks
-			URL.revokeObjectURL(imageUrl);
-		}
-	}
+	// 		// this.previewContext.fillStyle = '#aaaaaa';
+	// 		// this.previewContext.font = '14px monospace';
+	// 		// this.previewContext.fillText(`Target: ${url ?? 'about:blank'}`, 30, 80);
+	// 		// this.previewContext.fillText(`Engine: ${this.activeEngine || 'HappyDOM'}`, 30, 105);
+	// 	}
+	// 	finally
+	// 	{
+	// 		// Always revoke object URL to prevent memory leaks
+	// 		URL.revokeObjectURL(imageUrl);
+	// 	}
+	// }
 
 	// 1. Add a class property to track the active render task
 	private renderTask: any = null;
@@ -290,6 +294,23 @@ export class BrowserWidget extends Widget
 				const transform = outputScale !== 1
 					? [outputScale, 0, 0, outputScale, 0, 0]
 					: undefined;
+
+				// const colorProxyContext = new Proxy(this.previewContext, {
+				// 	set(target, prop, value)
+				// 	{
+				// 		// Intercept fillStyle / strokeStyle changes made by PDF.js
+				// 		if(prop === 'fillStyle' || prop === 'strokeStyle')
+				// 		{
+				// 			// Check if it's a dark color (e.g., near black text) and swap it
+				// 			if(typeof value === 'string' && (value === '#000000' || value === '#000' || value.startsWith('rgb(0')))
+				// 			{
+				// 				value = '#0066cc'; // Your custom color here
+				// 			}
+				// 		}
+				// 		(target as any)[prop] = value;
+				// 		return true;
+				// 	}
+				// });
 
 				const renderContext: RenderParameters = {
 					canvas: canvas,
@@ -364,7 +385,7 @@ export class BrowserWidget extends Widget
 		const pass = this.passInput.value;
 
 		// Render loading state in iframe
-		this.showLoading(this.addrInput.value);
+		// this.showLoading(this.addrInput.value);
 
 		const payload = JSON.stringify({
 			method: 'GET',
@@ -448,7 +469,7 @@ export class BrowserWidget extends Widget
 		} else if(this.offscreenCanvas)
 		{
 			this.canvasSent = true;
-			const pdf = await VirtualRendererManager.init({
+			const pdf = await widgetSelf.VirtualRendererManager.init({
 				html: htmlContent,
 				targetUrl: targetUrl,
 				canvasEl: !this.canvasSent ? this.offscreenCanvas : undefined,
@@ -503,13 +524,14 @@ export class BrowserWidget extends Widget
 	 */
 	private async renderFrameError(title: string, detail: string): Promise<void>
 	{
+		console.error(title, detail);
 		const errorHtml = `
 			<!DOCTYPE html>
 			<html>
 			<head>
 				<style>
 					body {
-						background-color: #181818;
+						background-color: transparent;
 						color: #f44336;
 						font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 						display: flex;
@@ -560,12 +582,12 @@ export class BrowserWidget extends Widget
 			{
 				console.error(err);
 				// Fallback text rendering if foreignObject SVG parsing fails or is restricted
-				if(this.previewContext)
-				{
-					this.previewContext.fillStyle = '#333333';
-					this.previewContext.font = '16px sans-serif';
-					this.previewContext.fillText(`Virtual DOM Updated [Engine: ${this.activeEngine}]: ${err}`, 20, 40);
-				}
+				// if(this.previewContext)
+				// {
+				// 	this.previewContext.fillStyle = '#333333';
+				// 	this.previewContext.font = '16px sans-serif';
+				// 	this.previewContext.fillText(`Virtual DOM Updated [Engine: ${this.activeEngine}]: ${err}`, 20, 40);
+				// }
 			}
 		}
 	}
@@ -586,7 +608,7 @@ export class BrowserWidget extends Widget
 		requestAnimationFrame(() =>
 		{
 
-			VirtualRendererManager.init({
+			widgetSelf.VirtualRendererManager.init({
 				html: BrowserWidget.LOADING_DOCUMENT.replace('${url}', this.addrInput.value),
 				targetUrl: this.addrInput.value,
 				canvasEl: !this.canvasSent ? this.offscreenCanvas : undefined,

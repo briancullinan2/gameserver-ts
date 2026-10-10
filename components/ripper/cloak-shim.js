@@ -89,7 +89,8 @@
 	// Captures clicks on <a> or <form> elements attempting to target the top-level window
 	window.addEventListener('click', (event) =>
 	{
-		const targetEl = event.target ? event.target.closest('a, form') : null;
+		/** @type {HTMLAnchorElement | HTMLFormElement | null} */
+		const targetEl = event.target ? /** @type {HTMLElement} */ (event.target).closest('a, form') : null;
 		if(targetEl)
 		{
 			const targetAttr = targetEl.getAttribute('target');
@@ -98,7 +99,7 @@
 				event.preventDefault();
 				event.stopPropagation();
 
-				const destinationUrl = targetEl.href || targetEl.action;
+				const destinationUrl = targetEl.href ?? /** @type {HTMLFormElement} */ (targetEl).action;
 				console.warn('[AntiBreakout] Intercepted target="_top" link click to:', destinationUrl);
 
 				// Rewrite navigation internally inside the iframe
@@ -225,15 +226,42 @@
 	if(navigator.permissions && navigator.permissions.query)
 	{
 		const originalQuery = navigator.permissions.query;
-		navigator.permissions.query = function (parameters)
-		{
-			if(parameters && parameters.name === 'notifications')
+		navigator.permissions.query =
+			/**
+			 * @this {Navigator}
+			 * @param {PermissionDescriptor} parameters
+			 * @returns {Promise<PermissionStatus | any>}
+			 */
+			function (parameters)
 			{
-				return Promise.resolve({ state: Notification.permission, onchange: null });
-			}
-			return originalQuery.apply(this, arguments);
-		};
+				if(parameters && parameters.name === 'notifications')
+				{
+					return Promise.resolve({ state: Notification.permission, onchange: null });
+				}
+				return originalQuery.apply(this, [/** @type {PermissionDescriptor} */(parameters)]);
+			};
 		markAsNative(navigator.permissions.query, 'query');
+	}
+
+	// Helper to safely redefine prototype getters with toString masking
+	/**
+	 *
+	 * @param {Function} proto
+	 * @param {string} prop
+	 * @param {(() => any)} getterFn
+	 */
+	function redefineGetter(proto, prop, getterFn)
+	{
+		markAsNative(getterFn, `get ${prop}`);
+		try
+		{
+			Object.defineProperty(proto, prop, {
+				get: getterFn,
+				set: undefined,
+				enumerable: true,
+				configurable: true
+			});
+		} catch(e) { }
 	}
 
 	/* ======================================================================== */
@@ -241,28 +269,8 @@
 	/* ======================================================================== */
 	(function cloakNavigator()
 	{
+		/** @type {any | typeof Navigator | Function} */
 		const NavProto = Navigator.prototype;
-
-		// Helper to safely redefine prototype getters with toString masking
-		/**
-		 *
-		 * @param {Function} proto
-		 * @param {string} prop
-		 * @param {(() => any)} getterFn
-		 */
-		function redefineGetter(proto, prop, getterFn)
-		{
-			markAsNative(getterFn, `get ${prop}`);
-			try
-			{
-				Object.defineProperty(proto, prop, {
-					get: getterFn,
-					set: undefined,
-					enumerable: true,
-					configurable: true
-				});
-			} catch(e) { }
-		}
 
 		// 1. Mask navigator.webdriver on Prototype level (returns undefined, no own-property leak)
 		redefineGetter(NavProto, 'webdriver', function webdriver()
@@ -275,9 +283,6 @@
 		{
 			return Object.freeze(['en-US', 'en']);
 		});
-
-		// 3. Mask navigator.getGamepads getter on Prototype
-		redefineGetter(NavProto, 'getGamepads', getGamepadsMock);
 
 		// 4. Mock navigator.plugins / mimeTypes to avoid empty array detection
 		const mockPluginList = Object.create(PluginArray.prototype);
@@ -293,8 +298,8 @@
 			const origQuery = navigator.permissions.query;
 			/**
 			 * @this {Navigator}
-			 * @param {any} parameters
-			 * @returns
+			 * @param {PermissionDescriptor} parameters
+			 * @returns {Promise<PermissionStatus | any>}
 			 */
 			const patchedQuery = function query(parameters)
 			{
@@ -302,7 +307,7 @@
 				{
 					return Promise.resolve({ state: 'granted', onchange: null });
 				}
-				return origQuery.apply(this, arguments);
+				return origQuery.apply(this, [/** @type {PermissionDescriptor} */(parameters)]);
 			};
 			markAsNative(patchedQuery, 'query');
 			NavProto.permissions.query = patchedQuery;
@@ -377,6 +382,9 @@
 		return list;
 	};
 	markAsNative(getGamepadsMock, 'getGamepads');
+
+	// 3. Mask navigator.getGamepads getter on Prototype
+	redefineGetter(/** @type {any | Function} */ (Navigator.prototype), 'getGamepads', getGamepadsMock);
 
 	try
 	{

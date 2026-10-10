@@ -1117,6 +1117,10 @@ serviceSelf.addEventListener('fetch', (event) =>
 		localName = '/base' + (assetUrl.startsWith('/') ? '' : '/') + assetUrl;
 	}
 
+	if(localName.includes('html-worker'))
+	{
+		// debugger;
+	}
 	const contentType = getMimeType(assetUrl);
 
 	event.respondWith((async () =>
@@ -1151,10 +1155,6 @@ serviceSelf.addEventListener('fetch', (event) =>
 		{
 			const files = await serviceSelf.getRecord?.(serviceSelf.DB_STORE_NAME ?? '', localName, selected);
 
-			if(localName.includes('html-worker'))
-			{
-				debugger;
-			}
 			if(files && files.contents)
 			{
 				/** @type {ArrayBuffer | undefined} */

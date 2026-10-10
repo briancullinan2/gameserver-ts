@@ -82,7 +82,7 @@ export class WebSocketMonitor
 				this.socket2 = null;
 			}
 
-			if(false && !this.socket2)
+			if(!this.socket2)
 			{
 				console.log('[WSMonitor] Connecting socket2...');
 				this.socket2 = new WebSocket(fullAddress);
