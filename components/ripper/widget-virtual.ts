@@ -152,6 +152,8 @@ export class VirtualRendererManager
 					type: 'INIT',
 					requestId,
 					payload: {
+						height: options.canvasEl?.clientHeight,
+						width: options.canvasEl?.clientWidth,
 						html: options.html,
 						url: options.targetUrl || 'https://virtual.local/',
 						canvas: offscreenCanvas

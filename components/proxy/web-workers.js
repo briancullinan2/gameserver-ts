@@ -10,6 +10,7 @@ const { WebSocketServer } = require('ws');
 const { Server } = require('./socks.server.js');
 const Stream = require('stream');
 const { respondRequest } = require('./web-middle.js');
+const startMasterServer = require('./master.js');
 
 // =============================================================================
 // JSDOC / TYPE ANNOTATIONS
@@ -32,7 +33,7 @@ const { respondRequest } = require('./web-middle.js');
  * @property {string} [method]
  * @property {string} [url]
  * @property {http.IncomingHttpHeaders} headers
- * @property {string} body
+ * @property {string | Buffer} body
  */
 
 /**
@@ -145,6 +146,8 @@ if(isMainThread)
 	/** @type {number} */
 	let netRoundRobin = 0;
 
+	startMasterServer(UDP_PORT);
+
 	console.log('[Primary] Initializing Worker Pools...');
 
 	// 1. Spawn 4 HTTP + WS Worker Combos
@@ -199,7 +202,7 @@ if(isMainThread)
 				method: req.method,
 				url: req.url,
 				headers: req.headers,
-				body: Buffer.concat(body).toString('utf-8')
+				body: Buffer.concat(body)
 			};
 
 			/**
@@ -276,97 +279,97 @@ if(isMainThread)
 	// B. MAIN TCP ROUTER / TUNNEL
 	// -------------------------------------------------------------------------
 	/** @type {net.Server} */
-	const mainTcpServer = net.createServer((/** @type {net.Socket} */ socket) =>
-	{
-		const worker = getNextNetWorker();
-		/** @type {string} */
-		const socketId = Math.random().toString(36).substring(2, 10);
+	// const mainTcpServer = net.createServer((/** @type {net.Socket} */ socket) =>
+	// {
+	// 	const worker = getNextNetWorker();
+	// 	/** @type {string} */
+	// 	const socketId = Math.random().toString(36).substring(2, 10);
 
-		socket.on('data', (/** @type {Buffer} */ data) =>
-		{
-			/** @type {TcpDataMessage} */
-			const tcpPayload = {
-				type: 'TCP_DATA',
-				socketId,
-				payload: Uint8Array.from(data)
-			};
-			worker.postMessage(tcpPayload);
-		});
+	// 	socket.on('data', (/** @type {Buffer} */ data) =>
+	// 	{
+	// 		/** @type {TcpDataMessage} */
+	// 		const tcpPayload = {
+	// 			type: 'TCP_DATA',
+	// 			socketId,
+	// 			payload: Uint8Array.from(data)
+	// 		};
+	// 		worker.postMessage(tcpPayload);
+	// 	});
 
-		/**
-		 * @param {TcpResponseMessage} msg
-		 */
-		const handleTcpResponse = (msg) =>
-		{
-			if(msg.type === 'TCP_RESPONSE' && msg.socketId === socketId)
-			{
-				socket.write(msg.payload);
-			}
-		};
+	// 	/**
+	// 	 * @param {TcpResponseMessage} msg
+	// 	 */
+	// 	const handleTcpResponse = (msg) =>
+	// 	{
+	// 		if(msg.type === 'TCP_RESPONSE' && msg.socketId === socketId)
+	// 		{
+	// 			socket.write(msg.payload);
+	// 		}
+	// 	};
 
-		worker.on('message', handleTcpResponse);
+	// 	worker.on('message', handleTcpResponse);
 
-		socket.on('close', () =>
-		{
-			worker.off('message', handleTcpResponse);
-			/** @type {TcpDisconnectMessage} */
-			const disconnectPayload = { type: 'TCP_DISCONNECT', socketId };
-			worker.postMessage(disconnectPayload);
-		});
+	// 	socket.on('close', () =>
+	// 	{
+	// 		worker.off('message', handleTcpResponse);
+	// 		/** @type {TcpDisconnectMessage} */
+	// 		const disconnectPayload = { type: 'TCP_DISCONNECT', socketId };
+	// 		worker.postMessage(disconnectPayload);
+	// 	});
 
-		socket.on('error', (/** @type {Error} */ err) => console.error('[Primary TCP Error]', err.message));
-	});
+	// 	socket.on('error', (/** @type {Error} */ err) => console.error('[Primary TCP Error]', err.message));
+	// });
 
-	mainTcpServer.listen(TCP_PORT, () =>
-	{
-		console.log(`[Primary] Listening for TCP connections on port ${TCP_PORT}`);
-	});
+	// mainTcpServer.listen(TCP_PORT, () =>
+	// {
+	// 	console.log(`[Primary] Listening for TCP connections on port ${TCP_PORT}`);
+	// });
 
 	// -------------------------------------------------------------------------
 	// C. MAIN UDP ROUTER / TUNNEL
 	// -------------------------------------------------------------------------
 	/** @type {dgram.Socket} */
-	const mainUdpSocket = dgram.createSocket('udp4');
+	// const mainUdpSocket = dgram.createSocket('udp4');
 
-	mainUdpSocket.on('message', (/** @type {Buffer} */ msg, /** @type {dgram.RemoteInfo} */ rinfo) =>
-	{
-		const worker = getNextNetWorker();
-		/** @type {string} */
-		const packetId = Math.random().toString(36).substring(2, 10);
+	// mainUdpSocket.on('message', (/** @type {Buffer} */ msg, /** @type {dgram.RemoteInfo} */ rinfo) =>
+	// {
+	// 	const worker = getNextNetWorker();
+	// 	/** @type {string} */
+	// 	const packetId = Math.random().toString(36).substring(2, 10);
 
-		/**
-		 * @param {UdpResponseMessage} response
-		 */
-		const handleUdpResponse = (response) =>
-		{
-			if(response.type === 'UDP_RESPONSE' && response.packetId === packetId)
-			{
-				worker.off('message', handleUdpResponse);
-				mainUdpSocket.send(
-					response.payload,
-					rinfo.port,
-					rinfo.address
-				);
-			}
-		};
+	// 	/**
+	// 	 * @param {UdpResponseMessage} response
+	// 	 */
+	// 	const handleUdpResponse = (response) =>
+	// 	{
+	// 		if(response.type === 'UDP_RESPONSE' && response.packetId === packetId)
+	// 		{
+	// 			worker.off('message', handleUdpResponse);
+	// 			mainUdpSocket.send(
+	// 				response.payload,
+	// 				rinfo.port,
+	// 				rinfo.address
+	// 			);
+	// 		}
+	// 	};
 
-		worker.on('message', handleUdpResponse);
+	// 	worker.on('message', handleUdpResponse);
 
-		/** @type {UdpDataMessage} */
-		const udpPayload = {
-			type: 'UDP_DATA',
-			packetId,
-			rinfo: { address: rinfo.address, port: rinfo.port },
-			payload: Uint8Array.from(msg)
-		};
+	// 	/** @type {UdpDataMessage} */
+	// 	const udpPayload = {
+	// 		type: 'UDP_DATA',
+	// 		packetId,
+	// 		rinfo: { address: rinfo.address, port: rinfo.port },
+	// 		payload: Uint8Array.from(msg)
+	// 	};
 
-		worker.postMessage(udpPayload);
-	});
+	// 	worker.postMessage(udpPayload);
+	// });
 
-	mainUdpSocket.bind(UDP_PORT, () =>
-	{
-		console.log(`[Primary] Listening for UDP datagrams on port ${UDP_PORT}`);
-	});
+	// mainUdpSocket.bind(UDP_PORT, () =>
+	// {
+	// 	console.log(`[Primary] Listening for UDP datagrams on port ${UDP_PORT}`);
+	// });
 
 } else
 {

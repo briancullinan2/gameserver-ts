@@ -7,7 +7,8 @@ const path = require('path');
 const Stream = require('stream');
 const { findFile, makeDirectoryHtml, layeredDir } = require('./web-layered');
 const { customMimeTypes, ASSETS_DIRECTORY } = require('./web-config');
-const { body } = require('happy-dom/lib/PropertySymbol');
+//const { body } = require('happy-dom/lib/PropertySymbol');
+const { buffer } = require('stream/consumers');
 // TODO: make this a configurable list instead
 const PUBLIC_HOST = 'localhost:4004';
 
@@ -61,10 +62,10 @@ async function respondRequest(request)
 	let localName = request.url ?? 'index.html';
 	try
 	{
-		const requestUrl = new URL(!request.url?.includes('://') ? (PUBLIC_HOST + request.url) : (request.url ?? 'index.html'), PUBLIC_HOST);
-		if(request.url && requestUrl.host)
+		const requestUrl = new URL(!request.url?.includes('://') ? ('http://' + PUBLIC_HOST + '/' + request.url) : (request.url ?? 'index.html'), 'http://' + PUBLIC_HOST);
+		//if(request.url && requestUrl.host)
 		{
-			localName = requestUrl.host + '/' + requestUrl.pathname;
+			localName = /*requestUrl.host + '/' +*/ requestUrl.pathname;
 		}
 		if(localName[0] == '/')
 		{
@@ -85,6 +86,7 @@ async function respondRequest(request)
 		localName = localName.substring(0, localName.length - 1);
 	}
 
+	console.log('Requesting: ' + localName);
 
 	let file;
 	// send files that exist in the layered file-system
@@ -247,7 +249,7 @@ async function sendCompressed(file, acceptEncoding)
 
 	return {
 		headers,
-		body: readStream,
+		body: await buffer(/** @type {fs.ReadStream} */(readStream)),
 	};
 }
 
