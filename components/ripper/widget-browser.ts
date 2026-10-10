@@ -212,7 +212,7 @@ export class BrowserWidget extends Widget
 			});
 
 			// Clear canvas background and draw
-			this.previewContext.fillStyle = '#ffffff';
+			this.previewContext.fillStyle = 'transparent';
 			this.previewContext.fillRect(0, 0, 800, 600);
 			this.previewContext.drawImage(img, 0, 0);
 		}
@@ -295,7 +295,8 @@ export class BrowserWidget extends Widget
 					canvas: canvas,
 					canvasContext: this.previewContext,
 					viewport: viewport,
-					transform: transform
+					transform: transform,
+					background: 'rgba(255, 255, 255, 0)'
 				};
 
 				this.renderTask = page.render(renderContext);
@@ -451,6 +452,8 @@ export class BrowserWidget extends Widget
 				html: htmlContent,
 				targetUrl: targetUrl,
 				canvasEl: !this.canvasSent ? this.offscreenCanvas : undefined,
+				height: this.offscreenCanvas?.clientHeight,
+				width: this.offscreenCanvas?.clientWidth,
 			});
 			if(pdf instanceof ArrayBuffer)
 			{
@@ -586,7 +589,9 @@ export class BrowserWidget extends Widget
 			VirtualRendererManager.init({
 				html: BrowserWidget.LOADING_DOCUMENT.replace('${url}', this.addrInput.value),
 				targetUrl: this.addrInput.value,
-				canvasEl: !this.canvasSent ? this.offscreenCanvas : undefined
+				canvasEl: !this.canvasSent ? this.offscreenCanvas : undefined,
+				height: this.offscreenCanvas?.clientHeight,
+				width: this.offscreenCanvas?.clientWidth,
 			});
 			this.canvasSent = true;
 

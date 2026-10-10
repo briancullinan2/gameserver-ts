@@ -1151,10 +1151,10 @@ serviceSelf.addEventListener('fetch', (event) =>
 		{
 			const files = await serviceSelf.getRecord?.(serviceSelf.DB_STORE_NAME ?? '', localName, selected);
 
-			// if(localName.includes('html-worker'))
-			// {
-			// 	debugger;
-			// }
+			if(localName.includes('html-worker'))
+			{
+				debugger;
+			}
 			if(files && files.contents)
 			{
 				/** @type {ArrayBuffer | undefined} */

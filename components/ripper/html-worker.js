@@ -87,8 +87,8 @@ const hasJSPDF = safeImportScript('/components/ripper/jspdf.umd.min.js?t=' + Dat
  * @property {OffscreenCanvas | undefined | null} [offscreenCanvas]
  * @property {OffscreenCanvasRenderingContext2D | undefined | null} [canvasCtx]
  * @property {'happy-dom' | 'jsdom' | 'none'} [activeEngine]
- * @property {any | Document} [document]
- * @property {any | Window} [window]
+ * @property {any | Document | import('happy-dom').Document} [document]
+ * @property {any | Window | import('happy-dom').Window} [window]
  * @property {number} [innerHeight]
  * @property {number} [innerWidth]
  * @property {() => void} [cloneToDocument]
@@ -133,8 +133,8 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 			const happyWindow = new /** @type {new(opt: any) => import('happy-dom').Window} */(workerSelf.Window)({
 				url: url,
 				settings: {
-					disableJavaScriptEvaluation: false,
-					disableCSSFileLoading: true
+					//disableJavaScriptEvaluation: false,
+					//disableCSSFileLoading: true
 				}
 			});
 
@@ -460,7 +460,7 @@ workerSelf.onmessage = async (event) =>
 			}
 			createVirtualDOM(html, url, engine);
 			// give the page time to settle
-			await new Promise(resolve => setTimeout(resolve, 2000));
+			await workerSelf.activeWindow.happyDOM.whenAsyncComplete();
 			if(typeof height === 'number')
 			{
 				workerSelf.innerHeight = height;

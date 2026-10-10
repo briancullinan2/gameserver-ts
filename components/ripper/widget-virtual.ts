@@ -6,6 +6,8 @@ export interface IRendererInitOptions
 	html: string;
 	targetUrl?: string;
 	canvasEl?: HTMLCanvasElement;
+	height?: number;
+	width?: number;
 }
 
 export interface IPDFExportOptions
@@ -152,8 +154,8 @@ export class VirtualRendererManager
 					type: 'INIT',
 					requestId,
 					payload: {
-						height: options.canvasEl?.clientHeight,
-						width: options.canvasEl?.clientWidth,
+						height: options.height ?? options.canvasEl?.clientHeight,
+						width: options.width ?? options.canvasEl?.clientWidth,
 						html: options.html,
 						url: options.targetUrl || 'https://virtual.local/',
 						canvas: offscreenCanvas
