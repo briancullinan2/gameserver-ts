@@ -7,6 +7,9 @@ const path = require('path');
 const Stream = require('stream');
 const { findFile, makeDirectoryHtml, layeredDir } = require('./web-layered');
 const { customMimeTypes, ASSETS_DIRECTORY } = require('./web-config');
+const { body } = require('happy-dom/lib/PropertySymbol');
+// TODO: make this a configurable list instead
+const PUBLIC_HOST = 'localhost:4004';
 
 /**
  *
@@ -49,18 +52,30 @@ let latestMtime = new Date();
 //let fullUrl = req.protocol + '://' + req.get('host') + req.originalUrl;
 /**
  *
- * @param {import('express').Request} request
- * @param {import('express').Response} response
- * @returns
+ * @param {import('./web-workers').HttpRequestMessage} request
+ * @returns {Promise<import('./web-workers').HttpResponseMessage>}
  */
-async function respondRequest(request, response)
+async function respondRequest(request)
 {
-	const { execSync } = require('child_process');
-	let localName = path.join(request.baseUrl, request.path);
-	if(localName[0] == '/')
-		localName = localName.substring(1);
+	//const { execSync } = require('child_process');
+	let localName = request.url ?? 'index.html';
+	try
+	{
+		const requestUrl = new URL(request.url?.includes('://') ? (PUBLIC_HOST + request.url) : (request.url ?? 'index.html'), PUBLIC_HOST);
+		if(request.url && requestUrl.host)
+		{
+			localName = requestUrl.host + '/' + requestUrl.pathname;
+		}
+		if(localName[0] == '/')
+		{
+			localName = localName.substring(1);
+		}
+	} catch(e)
+	{
+		console.error(e);
+	}
 	// remove MAINMENU from path
-	let menuDir = localName.substring(localName.lastIndexOf('/'));
+	// let menuDir = localName.substring(localName.lastIndexOf('/'));
 	// if(MENU_PATHS.includes(menuDir.toUpperCase()))
 	// {
 	// 	localName = localName.substring(0, localName.length - menuDir.length);
@@ -69,23 +84,6 @@ async function respondRequest(request, response)
 	{
 		localName = localName.substring(0, localName.length - 1);
 	}
-	//if(localName.startsWith(GAME_DIRECTORY))
-	//  localName = localName.substring(GAME_DIRECTORY.length)
-	//if(localName[0] == '/')
-	//  localName = localName.substring(1)
-
-	// list palette images for pk3dirs
-	// if(localName.includes('.pk3dir/scripts/')
-	// 	&& localName.endsWith('.shader'))
-	// {
-	// 	let mapName = path.basename(localName.substring(0, localName.length - 7));
-	// 	let newPath = path.join(ASSETS_DIRECTORY,
-	// 		localName.substring(GAME_DIRECTORY.length), '../../maps/', mapName + '.bsp');
-	// 	if(fs.existsSync(newPath))
-	// 	{
-	// 		return makePaletteShader(localName, response);
-	// 	}
-	// }
 
 
 	let file;
@@ -93,27 +91,47 @@ async function respondRequest(request, response)
 	if((file = findFile(localName)))
 	{
 		const ext = path.extname(file).toLowerCase();
-		if(typeof customMimeTypes[ext] === 'string')
-		{
-			response.setHeader('Content-Type', customMimeTypes[ext]);
-		}
+		const headers = typeof customMimeTypes[ext] === 'string'
+			? { 'Content-Type': customMimeTypes[ext] }
+			: undefined;
 		// TODO: if loading a directory return a formatted file index HTML directory listing
 		if(fs.statSync(file).isDirectory())
 		{
 			if((file = findFile(path.join(localName, 'index.html'))))
 			{
-				return response.sendFile(path.resolve(file));
+				return {
+					requestId: request.requestId,
+					statusCode: 200,
+					body: fs.readFileSync(path.resolve(file))
+				};
 			} else
 			{
 				let list = layeredDir(localName);
-				return response.send(makeDirectoryHtml(localName, list));
+				return {
+					requestId: request.requestId,
+					body: makeDirectoryHtml(localName, list)
+				};
 			}
-		} else if(request.headers['accept-encoding'])
+		}
+		/*else if(fs.statSync(file).size > 5 * 1024 * 1024)
 		{
-			return await sendCompressed(path.resolve(file), response, request.headers['accept-encoding']);
-		} else
+			return {
+				requestId: request.requestId,
+				statusCode: 307,
+				headers: {
+					'Location': PUBLIC_HOST ?? requestUrl.protocol + '://' + requestUrl.hostname +
+				}
+			};
+		} */
+		else if(request.headers['accept-encoding'])
 		{
-			return response.sendFile(path.resolve(file));
+			return await sendCompressed(path.resolve(file), request.headers['accept-encoding']);
+		}
+		else
+		{
+			return {
+				body: fs.readFileSync(path.resolve(file))
+			};
 		}
 	}
 
@@ -130,53 +148,10 @@ async function respondRequest(request, response)
 		{
 			writeVersionFile(latestMtime);
 		}
-		response.sendFile(path.resolve(newPath));
+		return {
+			body: fs.readFileSync(path.resolve(newPath))
+		};
 	}
-
-	// if loading an image in a different format convert it
-	// if((file = findAltImage(localName)))
-	// {
-	// 	let newPath = path.join(ASSETS_DIRECTORY, localName.substring(GAME_DIRECTORY.length));
-	// 	let alpha = hasAlpha(file);
-	// 	if((!alpha && localName.includes('.jpeg'))
-	// 		|| (alpha && localName.includes('.png')))
-	// 	{
-	// 		execSync(`magick "${file}" -auto-orient -strip -quality 50% "${path.resolve(newPath)}"`, { stdio: 'pipe' });
-	// 	}
-	// 	if(fs.existsSync(newPath))
-	// 	{
-	// 		if(request.headers['accept-encoding'])
-	// 		{
-	// 			return sendCompressed(path.resolve(file), response, request.headers['accept-encoding']);
-	// 		} else
-	// 		{
-	// 			return response.sendFile(path.resolve(newPath));
-	// 		}
-	// 	}
-	// }
-
-	// if loading audio in a different format
-	// if((file = findAltAudio(localName)))
-	// {
-	// 	let newPath = path.join(ASSETS_DIRECTORY, localName.substring(GAME_DIRECTORY.length));
-	// 	if(file.includes('.mp3'))
-	// 	{
-	// 		execSync(`ffmpeg -i "${file}" -c:a libvorbis -q:a 4 "${path.resolve(newPath)}"`, { stdio: 'pipe' });
-	// 	} if(localName.includes('.ogg') || file.includes('.wav'))
-	// 	{
-	// 		execSync(`oggenc -q 7 --downmix --resample 11025 --quiet "${file}" -n "${path.resolve(newPath)}"`, { stdio: 'pipe' });
-	// 	}
-	// 	if(fs.existsSync(newPath))
-	// 	{
-	// 		if(request.headers['accept-encoding'])
-	// 		{
-	// 			return sendCompressed(path.resolve(file), response, request.headers['accept-encoding']);
-	// 		} else
-	// 		{
-	// 			return response.sendFile(path.resolve(newPath));
-	// 		}
-	// 	}
-	// }
 
 
 	if((file = findFile('index.html')))
@@ -184,13 +159,15 @@ async function respondRequest(request, response)
 		// if loading a missing path return the index page
 		if(localName.length < 2)
 		{ // index page?
-			return response.sendFile(path.resolve(file));
-		} else
-		{
-			return response.status(404).send(); //.sendFile(path.resolve(file))
+			return {
+				body: fs.readFileSync(path.resolve(file))
+			};
 		}
 	}
 
+	return {
+		statusCode: 404
+	};
 }
 
 
@@ -201,10 +178,10 @@ let mime;
 /**
  *
  * @param {string} file
- * @param {import('express').Response} res
  * @param {string[] | string} acceptEncoding
+ * @return {Promise<import('./web-workers').HttpResponseMessage>}
  */
-async function sendCompressed(file, res, acceptEncoding)
+async function sendCompressed(file, acceptEncoding)
 {
 	const turnOffCompression = true;
 	if(!zlib)
@@ -222,15 +199,19 @@ async function sendCompressed(file, res, acceptEncoding)
 	}
 	/** @type {Stream} */
 	let readStream = fs.createReadStream(file);
-	res.setHeader('cache-control', 'public, max-age=31557600');
-	res.setHeader('content-type', mime.getType(file) ?? 'application/octet-stream');
+	/** @type {Record<string, string>} */
+	const headers = {
+		'Cache-Control': 'public, max-age=' + (path.resolve(file).startsWith(path.resolve(__dirname, '..')) ? 0 : 31557600),
+		'Content-Type': mime.getType(file) ?? 'application/octet-stream',
+	};
+	let contentLength = 0;
 	// if compressed version already exists, send it directly
 	if(!turnOffCompression && acceptEncoding.includes('br'))
 	{
-		res.append('content-encoding', 'br');
+		headers['Content-Encoding'] = 'br';
 		if(fs.existsSync(file + '.br'))
 		{
-			res.append('content-length', fs.statSync(file + '.br').size + '');
+			contentLength = fs.statSync(file + '.br').size;
 			readStream = fs.createReadStream(file + '.br');
 		} else
 		{
@@ -238,10 +219,10 @@ async function sendCompressed(file, res, acceptEncoding)
 		}
 	} else if(!turnOffCompression && acceptEncoding.includes('gzip'))
 	{
-		res.append('content-encoding', 'gzip');
+		headers['Content-Encoding'] = 'gzip';
 		if(fs.existsSync(file + '.gz'))
 		{
-			res.append('content-length', fs.statSync(file + '.gz').size + '');
+			contentLength = fs.statSync(file + '.gz').size;
 			readStream = fs.createReadStream(file + '.gz');
 		} else
 		{
@@ -249,10 +230,10 @@ async function sendCompressed(file, res, acceptEncoding)
 		}
 	} else if(!turnOffCompression && acceptEncoding.includes('deflate'))
 	{
-		res.append('content-encoding', 'deflate');
+		headers['Content-Encoding'] = 'deflate';
 		if(fs.existsSync(file + '.df'))
 		{
-			res.append('content-length', fs.statSync(file + '.df').size + '');
+			contentLength = fs.statSync(file + '.df').size;
 			readStream = fs.createReadStream(file + '.df');
 		} else
 		{
@@ -260,10 +241,14 @@ async function sendCompressed(file, res, acceptEncoding)
 		}
 	} else
 	{
-		res.append('content-length', fs.statSync(file).size + '');
+		contentLength = fs.statSync(file).size;
 	}
+	headers['Content-Length'] = '' + contentLength;
 
-	readStream.pipe(res);
+	return {
+		headers,
+		body: readStream,
+	};
 }
 
 /** @type {ReturnType<typeof setTimeout> | undefined} */

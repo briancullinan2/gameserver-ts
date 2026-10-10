@@ -23,6 +23,10 @@
 			configurable: false
 		},
 		replace: {
+			/**
+			 *
+			 * @param {string} url
+			 */
 			value: function replace(url)
 			{
 				console.warn('[AntiBreakout] Intercepted location.replace breakout attempt to:', url);
@@ -31,6 +35,10 @@
 			configurable: false
 		},
 		assign: {
+			/**
+			 *
+			 * @param {string} url
+			 */
 			value: function assign(url)
 			{
 				console.warn('[AntiBreakout] Intercepted location.assign breakout attempt to:', url);
@@ -128,6 +136,11 @@
 	const NativeFunctionToString = Function.prototype.toString;
 	const overriddenMethods = new WeakSet();
 
+	/**
+	 *
+	 * @param {Function} fn
+	 * @param {string} name
+	 */
 	function markAsNative(fn, name)
 	{
 		overriddenMethods.add(fn);
@@ -231,6 +244,12 @@
 		const NavProto = Navigator.prototype;
 
 		// Helper to safely redefine prototype getters with toString masking
+		/**
+		 *
+		 * @param {Function} proto
+		 * @param {string} prop
+		 * @param {(() => any)} getterFn
+		 */
 		function redefineGetter(proto, prop, getterFn)
 		{
 			markAsNative(getterFn, `get ${prop}`);
@@ -272,6 +291,11 @@
 		if(navigator.permissions && navigator.permissions.query)
 		{
 			const origQuery = navigator.permissions.query;
+			/**
+			 * @this {Navigator}
+			 * @param {any} parameters
+			 * @returns
+			 */
 			const patchedQuery = function query(parameters)
 			{
 				if(parameters && parameters.name === 'notifications')
@@ -319,6 +343,12 @@
 	/* ======================================================================== */
 	const virtualGamepads = new Map();
 
+	/**
+	 *
+	 * @param {string} id
+	 * @param {number} index
+	 * @returns
+	 */
 	function createMockGamepad(id, index)
 	{
 		return {

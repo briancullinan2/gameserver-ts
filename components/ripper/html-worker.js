@@ -112,6 +112,7 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 	{
 		initialized = true;
 		workerSelf.document.open();
+		// @ts-ignore
 		document.baseURI = url;
 		document.write(html);
 		return;
@@ -551,7 +552,7 @@ input, button, textarea, select {
 	if(false && workerSelf.activeDocument?.body)
 	{
 		debugger;
-		await doc.html(/** @type {any | HTMLElement}*/(workerSelf.activeDocument.body.children[0]), {
+		await doc.html(/** @type {any | HTMLElement}*/(workerSelf.activeDocument?.body.children[0]), {
 			callback: function (doc)
 			{
 				//document.body.removeChild(container);

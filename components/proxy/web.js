@@ -182,7 +182,7 @@ for(let i = 0; i < process.argv.length; i++)
 
 if(runServer)
 {
-	require('./web-workers');
+	require('./web-workers.js');
 } else
 {
 	console.log('Not running server. Exiting.');

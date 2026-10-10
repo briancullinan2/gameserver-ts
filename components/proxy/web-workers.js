@@ -7,6 +7,8 @@ const net = require('net');
 const dgram = require('dgram');
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const Stream = require('stream');
+const { respondRequest } = require('./web-middle.js');
 
 // =============================================================================
 // JSDOC / TYPE ANNOTATIONS
@@ -34,10 +36,10 @@ const { WebSocketServer } = require('ws');
 
 /**
  * @typedef {Object} HttpResponseMessage
- * @property {string} requestId
- * @property {number} statusCode
- * @property {Record<string, string>} headers
- * @property {string} body
+ * @property {string} [requestId]
+ * @property {number| undefined} [statusCode]
+ * @property {Record<string, string> | undefined} [headers]
+ * @property {string | Buffer | Stream} [body]
  */
 
 /**
@@ -103,12 +105,6 @@ const { WebSocketServer } = require('ws');
  * @typedef {TcpDataMessage | TcpDisconnectMessage | UdpDataMessage} NetWorkerIncomingMessage
  */
 
-/**
- * @typedef {Object} HttpResponseStubResult
- * @property {number} statusCode
- * @property {Record<string, string>} headers
- * @property {string} body
- */
 
 // =============================================================================
 // MAIN PORTS & CONFIGURATION
@@ -228,6 +224,7 @@ if(isMainThread)
 
 	mainWss.on('connection', (/** @type {import('ws').WebSocket} */ ws) =>
 	{
+		// TODO: socks._onConnection.bind(socks)
 		const worker = getNextWebWorker();
 		/** @type {string} */
 		const connectionId = Math.random().toString(36).substring(2, 10);
@@ -381,12 +378,12 @@ if(isMainThread)
 	{
 		console.log(`[Worker ${id}] Ready for HTTP & WS tasks...`);
 
-		parentPort?.on('message', (/** @type {WebWorkerIncomingMessage} */ msg) =>
+		parentPort?.on('message', async (/** @type {WebWorkerIncomingMessage} */ msg) =>
 		{
 			switch(msg.type)
 			{
 				case 'HTTP_REQUEST': {
-					const response = handleHttpRequestStub(msg, id);
+					const response = await handleHttpRequestStub(msg, id);
 					parentPort?.postMessage({
 						requestId: msg.requestId,
 						statusCode: response.statusCode,
@@ -458,15 +455,16 @@ if(isMainThread)
 /**
  * @param {HttpRequestMessage} msg
  * @param {number} workerId
- * @returns {HttpResponseStubResult}
+ * @returns {Promise<HttpResponseMessage>}
  */
-function handleHttpRequestStub(msg, workerId)
+async function handleHttpRequestStub(msg, workerId)
 {
-	return {
-		statusCode: 200,
-		headers: { 'Content-Type': 'text/plain' },
-		body: `[HTTP Worker ${workerId}] Handled ${msg.method} request for ${msg.url}`
-	};
+	// return {
+	// 	statusCode: 200,
+	// 	headers: { 'Content-Type': 'text/plain' },
+	// 	body: `[HTTP Worker ${workerId}] Handled ${msg.method} request for ${msg.url}`
+	// };
+	return await respondRequest(msg);
 }
 
 /**

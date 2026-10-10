@@ -169,3 +169,71 @@ function makePaletteShader(localName, response)
 	if(response)
 		return response.send(existingPalette);
 }
+
+
+function respondRequest()
+{
+	//if(localName.startsWith(GAME_DIRECTORY))
+	//  localName = localName.substring(GAME_DIRECTORY.length)
+	//if(localName[0] == '/')
+	//  localName = localName.substring(1)
+
+	// list palette images for pk3dirs
+	// if(localName.includes('.pk3dir/scripts/')
+	// 	&& localName.endsWith('.shader'))
+	// {
+	// 	let mapName = path.basename(localName.substring(0, localName.length - 7));
+	// 	let newPath = path.join(ASSETS_DIRECTORY,
+	// 		localName.substring(GAME_DIRECTORY.length), '../../maps/', mapName + '.bsp');
+	// 	if(fs.existsSync(newPath))
+	// 	{
+	// 		return makePaletteShader(localName, response);
+	// 	}
+	// }
+
+	// if loading an image in a different format convert it
+	// if((file = findAltImage(localName)))
+	// {
+	// 	let newPath = path.join(ASSETS_DIRECTORY, localName.substring(GAME_DIRECTORY.length));
+	// 	let alpha = hasAlpha(file);
+	// 	if((!alpha && localName.includes('.jpeg'))
+	// 		|| (alpha && localName.includes('.png')))
+	// 	{
+	// 		execSync(`magick "${file}" -auto-orient -strip -quality 50% "${path.resolve(newPath)}"`, { stdio: 'pipe' });
+	// 	}
+	// 	if(fs.existsSync(newPath))
+	// 	{
+	// 		if(request.headers['accept-encoding'])
+	// 		{
+	// 			return sendCompressed(path.resolve(file), response, request.headers['accept-encoding']);
+	// 		} else
+	// 		{
+	// 			return response.sendFile(path.resolve(newPath));
+	// 		}
+	// 	}
+	// }
+
+	// if loading audio in a different format
+	// if((file = findAltAudio(localName)))
+	// {
+	// 	let newPath = path.join(ASSETS_DIRECTORY, localName.substring(GAME_DIRECTORY.length));
+	// 	if(file.includes('.mp3'))
+	// 	{
+	// 		execSync(`ffmpeg -i "${file}" -c:a libvorbis -q:a 4 "${path.resolve(newPath)}"`, { stdio: 'pipe' });
+	// 	} if(localName.includes('.ogg') || file.includes('.wav'))
+	// 	{
+	// 		execSync(`oggenc -q 7 --downmix --resample 11025 --quiet "${file}" -n "${path.resolve(newPath)}"`, { stdio: 'pipe' });
+	// 	}
+	// 	if(fs.existsSync(newPath))
+	// 	{
+	// 		if(request.headers['accept-encoding'])
+	// 		{
+	// 			return sendCompressed(path.resolve(file), response, request.headers['accept-encoding']);
+	// 		} else
+	// 		{
+	// 			return response.sendFile(path.resolve(newPath));
+	// 		}
+	// 	}
+	// }
+
+}
