@@ -7,6 +7,7 @@ const net = require('net');
 const dgram = require('dgram');
 const http = require('http');
 const { WebSocketServer } = require('ws');
+const { Server } = require('./socks.server.js');
 const Stream = require('stream');
 const { respondRequest } = require('./web-middle.js');
 
@@ -221,48 +222,50 @@ if(isMainThread)
 
 	/** @type {InstanceType<typeof WebSocketServer>} */
 	const mainWss = new WebSocketServer({ server: mainHttpServer });
+	const socks = new Server;
 
-	mainWss.on('connection', (/** @type {import('ws').WebSocket} */ ws) =>
-	{
-		// TODO: socks._onConnection.bind(socks)
-		const worker = getNextWebWorker();
-		/** @type {string} */
-		const connectionId = Math.random().toString(36).substring(2, 10);
+	mainWss.on('connection', socks._onConnection.bind(socks));
+	// (/** @type {import('ws').WebSocket} */ ws) =>
+	// {
+	// /** @type {Worker} */
+	// const worker = getNextWebWorker();
+	// /** @type {string} */
+	// const connectionId = Math.random().toString(36).substring(2, 10);
 
-		// Tunnel incoming WS messages to worker
-		ws.on('message', (/** @type {Buffer | ArrayBuffer | Buffer[]} */ data) =>
-		{
-			/** @type {WsMessagePayload} */
-			const messagePayload = {
-				type: 'WS_MESSAGE',
-				connectionId,
-				payload: data.toString()
-			};
-			worker.postMessage(messagePayload);
-		});
+	// // Tunnel incoming WS messages to worker
+	// ws.on('message', (/** @type {Buffer | ArrayBuffer | Buffer[]} */ data) =>
+	// {
+	// 	/** @type {WsMessagePayload} */
+	// 	const messagePayload = {
+	// 		type: 'WS_MESSAGE',
+	// 		connectionId,
+	// 		payload: data.toString()
+	// 	};
+	// 	worker.postMessage(messagePayload);
+	// });
 
-		// Listen for responses back from worker intended for this WS client
-		/**
-		 * @param {WsResponseMessage} msg
-		 */
-		const handleWsResponse = (msg) =>
-		{
-			if(msg.type === 'WS_RESPONSE' && msg.connectionId === connectionId)
-			{
-				ws.send(msg.payload);
-			}
-		};
+	// // Listen for responses back from worker intended for this WS client
+	// /**
+	//  * @param {WsResponseMessage} msg
+	//  */
+	// const handleWsResponse = (msg) =>
+	// {
+	// 	if(msg.type === 'WS_RESPONSE' && msg.connectionId === connectionId)
+	// 	{
+	// 		ws.send(msg.payload);
+	// 	}
+	// };
 
-		worker.on('message', handleWsResponse);
+	// worker.on('message', handleWsResponse);
 
-		ws.on('close', () =>
-		{
-			worker.off('message', handleWsResponse);
-			/** @type {WsDisconnectMessage} */
-			const disconnectPayload = { type: 'WS_DISCONNECT', connectionId };
-			worker.postMessage(disconnectPayload);
-		});
-	});
+	// ws.on('close', () =>
+	// {
+	// 	worker.off('message', handleWsResponse);
+	// 	/** @type {WsDisconnectMessage} */
+	// 	const disconnectPayload = { type: 'WS_DISCONNECT', connectionId };
+	// 	worker.postMessage(disconnectPayload);
+	// });
+	// });
 
 	mainHttpServer.listen(HTTP_WS_PORT, () =>
 	{

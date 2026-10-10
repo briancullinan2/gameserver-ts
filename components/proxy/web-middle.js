@@ -61,7 +61,7 @@ async function respondRequest(request)
 	let localName = request.url ?? 'index.html';
 	try
 	{
-		const requestUrl = new URL(request.url?.includes('://') ? (PUBLIC_HOST + request.url) : (request.url ?? 'index.html'), PUBLIC_HOST);
+		const requestUrl = new URL(!request.url?.includes('://') ? (PUBLIC_HOST + request.url) : (request.url ?? 'index.html'), PUBLIC_HOST);
 		if(request.url && requestUrl.host)
 		{
 			localName = requestUrl.host + '/' + requestUrl.pathname;
