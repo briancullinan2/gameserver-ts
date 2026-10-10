@@ -82,7 +82,7 @@ export class WebSocketMonitor
 				this.socket2 = null;
 			}
 
-			if(!this.socket2)
+			if(false && !this.socket2)
 			{
 				console.log('[WSMonitor] Connecting socket2...');
 				this.socket2 = new WebSocket(fullAddress);
@@ -485,6 +485,8 @@ export class WebSocketMonitor
 		});
 	}
 
+
+
 	/**
 	 * Manufactures getinfo response for quick ping / server browser scanning.
 	 */
@@ -518,10 +520,11 @@ export class WebSocketMonitor
 			this.sendQ3UDPMessage(targetAddr, port, infoString);
 		});
 	}
-
-
-
 }
 
-widgetSelf.WebSocketMonitor = WebSocketMonitor;
-widgetSelf.WebSocketMonitor.initQ3Socks5Networking();
+
+if(!widgetSelf.WebSocketMonitor)
+{
+	widgetSelf.WebSocketMonitor = WebSocketMonitor;
+	widgetSelf.WebSocketMonitor.initQ3Socks5Networking();
+}

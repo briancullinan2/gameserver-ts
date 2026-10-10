@@ -104,6 +104,7 @@ export class MasterListWidget extends Widget
 	private staleInterval?: ReturnType<typeof setInterval>;
 	private cachedFilteredServers: ServerEntry[] = [];
 	private cachedFilteredFavorites: ServerEntry[] = [];
+	initialize: Promise<void> | undefined;
 
 	public get serverSelected(): ISignal<Widget, IServerSelectedArgs>
 	{
@@ -146,13 +147,26 @@ export class MasterListWidget extends Widget
 		this.addClass('sc-sidebar');
 
 		this.buildLayout();
-		widgetSelf.WebSocketMonitor.initQ3Socks5Networking();
+		if(!widgetSelf.WebSocketMonitor)
+		{
+			this.initialize = widgetSelf.preloadDependencies?.(['/components/rcon/websocket.ts'])
+				.then(() =>
+					widgetSelf.WebSocketMonitor.initQ3Socks5Networking()
+				);
+		} else
+		{
+			widgetSelf.WebSocketMonitor.initQ3Socks5Networking();
+		}
 		MasterListWidget._instance = this;
 	}
 
-	protected override onAfterAttach(msg: Message): void
+	protected override async onAfterAttach(msg: Message): Promise<void>
 	{
 		super.onAfterAttach(msg);
+		if(this.initialize)
+		{
+			await this.initialize;
+		}
 
 		widgetSelf.WebSocketMonitor.serverResponse.connect(this.subResponse);
 		this.refreshMasterServerList();

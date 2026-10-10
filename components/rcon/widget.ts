@@ -4,7 +4,7 @@ import { TerminalWidget } from '../terminal/widget';
 import { Message } from '@lumino/messaging';
 import type { LuminoLayoutWindow } from '../bundle/lumino.d';
 import type { GlobalToolbarsWindow, LuminoMenuWindow, RepositorySettingsWindow } from '../bundle/menu.d';
-import { ISocketMessage, WebSocketMonitor } from './websocket';
+import type { ISocketMessage, WebSocketMonitor } from './websocket';
 import { IAddServerArgs, IRemoveServerArgs, IServerSelectedArgs, MasterListWidget } from './widget-master';
 import type { SettingConfig } from '../bundle/settings';
 
@@ -54,6 +54,7 @@ export class RCONWidget extends Widget
 	private subAdd: (_: any, args: IAddServerArgs) => void = (_, args) => this.addServer(args.item);
 	private subRemove: (_: any, args: IRemoveServerArgs) => void = (_, args) => this.removeServer(args.item);
 	private subResponse: (_: any, args: ISocketMessage) => void = (_, args) => this.handleIncomingQ3Packet(args.address, args.data);
+	initialize: Promise<void> | undefined;
 
 	constructor(title?: string)
 	{
@@ -64,7 +65,16 @@ export class RCONWidget extends Widget
 		this.title.closable = true;
 
 		this.buildLayout();
-		widgetSelf.WebSocketMonitor.initQ3Socks5Networking();
+		if(!widgetSelf.WebSocketMonitor)
+		{
+			this.initialize = widgetSelf.preloadDependencies?.(['/components/rcon/websocket.ts'])
+				.then(() =>
+					widgetSelf.WebSocketMonitor.initQ3Socks5Networking()
+				);
+		} else
+		{
+			widgetSelf.WebSocketMonitor.initQ3Socks5Networking();
+		}
 	}
 
 	protected override onAfterShow(msg: Message): void
@@ -126,9 +136,13 @@ export class RCONWidget extends Widget
 	}
 
 
-	protected override onAfterAttach(msg: Message): void
+	protected override async onAfterAttach(msg: Message): Promise<void>
 	{
 		super.onAfterAttach(msg);
+		if(this.initialize)
+		{
+			await this.initialize;
+		}
 		widgetSelf.WebSocketMonitor.serverResponse.connect(this.subResponse);
 
 		// Instantiating attached child TerminalWidget

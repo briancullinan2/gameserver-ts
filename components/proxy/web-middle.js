@@ -14,35 +14,37 @@ const PUBLIC_HOST = 'localhost:4004';
 
 /**
  *
- * @param {import('express').Request} req
- * @param {import('express').Response} res
- * @param {Function} next
- * @returns
+ * @param {import('./web-workers').HttpRequestMessage} request
+ * @returns {import('./web-workers').HttpResponseMessage}
  */
 
-function middleware(req, res, next)
+function middleware(request)
 {
-	// Essential for CORS in Workers
-	res.setHeader('Access-Control-Allow-Origin', '*');
-	res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-	res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
-	res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
+	/** @type {import('./web-workers').HttpResponseMessage} */
+	const response = {
+		// Essential for CORS in Workers
+		headers: {
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+			'Access-Control-Allow-Headers': 'Content-Type, Range',
+			'Access-Control-Expose-Headers': 'Content-Length, Content-Range',
 
-	// Essential for SharedArrayBuffer / Cross-Origin Isolation
-	res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-	res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-	res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+			// Essential for SharedArrayBuffer / Cross-Origin Isolation
+			'Cross-Origin-Opener-Policy': 'same-origin',
+			'Cross-Origin-Embedder-Policy': 'require-corp',
+			'Cross-Origin-Resource-Policy': 'cross-origin',
 
-	res.setHeader('Content-Security-Policy', "script-src 'self' 'unsafe-eval' 'sha256-iN7wpJdxHlpujRppkOA8N0+Mzp0ZqZr3lCtxM00Y63c='; worker-src 'self' blob:;");
-	res.setHeader('Permissions-Policy', 'cross-origin-isolated=(*)');
+			'Content-Security-Policy': "script-src 'self' 'unsafe-eval' 'sha256-iN7wpJdxHlpujRppkOA8N0+Mzp0ZqZr3lCtxM00Y63c='; worker-src 'self' blob:;",
+			'Permissions-Policy': 'cross-origin-isolated=(*)',
+		}
+	};
 
-	if(req.method === 'OPTIONS')
+	if(request.method === 'OPTIONS')
 	{
-		res.statusCode = 204;
-		return res.end();
+		response.statusCode = 204;
 	}
 
-	next();
+	return response;
 }
 
 

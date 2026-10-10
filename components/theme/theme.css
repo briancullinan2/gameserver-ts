@@ -21,6 +21,7 @@
 
 body,
 .theme-monokai {
+	--total-scale-factor: 1;
 	/* Main Backgrounds */
 	--ace-bg: #272822;
 	--ace-gutter-bg: #2F3129;

@@ -131,9 +131,9 @@ export class VirtualRendererManager
 			{
 				try
 				{
-					await managerSelf.fetchAndStore?.('/components/ripper/html-worker.js');
-					const workerPath = options.workerUrl || '/base/components/ripper/html-worker.js';
-					this.worker = new Worker(workerPath + '?t=' + Date.now() + '&local-csp=true');
+					const workerPath = options.workerUrl || '/components/ripper/html-worker.js';
+					await managerSelf.fetchAndStore?.(workerPath);
+					this.worker = new Worker('/base' + workerPath + '?t=' + Date.now() + '&local-csp=true');
 
 					this.worker.onmessage = (e) => this.handleWorkerMessage(e);
 					this.worker.onerror = (e) => this.handleWorkerError(e);

@@ -276,7 +276,11 @@ async function fetchAsset(urlInput, key, selected)
 		{
 			console.log(`🌐 [SW-NET] Launching direct Request object pass-through fetch for URL: "${urlString}"`);
 			// If passing a Request object, clone it if it's going to be reused or has a body
-			response = await fetch(urlInput);
+			response = await fetch(urlInput, {
+				cache: 'no-store',
+				credentials: 'omit',
+				signal: timeoutSignal
+			});
 		}
 
 		console.log(`🌐 [SW-NET] Fetch response received for "${key}". Status: ${response.status} (${response.statusText}) | Type: ${response.type}`);
@@ -1146,6 +1150,11 @@ serviceSelf.addEventListener('fetch', (event) =>
 		try
 		{
 			const files = await serviceSelf.getRecord?.(serviceSelf.DB_STORE_NAME ?? '', localName, selected);
+
+			// if(localName.includes('html-worker'))
+			// {
+			// 	debugger;
+			// }
 			if(files && files.contents)
 			{
 				/** @type {ArrayBuffer | undefined} */
@@ -1186,7 +1195,7 @@ serviceSelf.addEventListener('fetch', (event) =>
 			}
 		} catch(dbReadErr)
 		{
-			console.error(`❌ [SW-FETCH-STORE] DB Crash for key "${localName}":`, dbReadErr);
+			originalConsole.error(`❌ [SW-FETCH-STORE] DB Crash for key "${localName}":`, dbReadErr);
 		}
 
 		return fetch(event.request);

@@ -89,6 +89,8 @@ const hasJSPDF = safeImportScript('/components/ripper/jspdf.umd.min.js?t=' + Dat
  * @property {'happy-dom' | 'jsdom' | 'none'} [activeEngine]
  * @property {any | Document} [document]
  * @property {any | Window} [window]
+ * @property {number} [innerHeight]
+ * @property {number} [innerWidth]
  * @property {() => void} [cloneToDocument]
  */
 
@@ -273,8 +275,9 @@ async function renderToCanvas()
 	}
 }
 
+
 /**
- * Generates PDF bytes using jsPDF
+ * Generates PDF bytes using jsPDF by traversing Happy DOM nodes in a Web Worker.
  * @param {import('jspdf').jsPDFOptions} [options]
  * @returns {Promise<ArrayBuffer>}
  */
@@ -288,295 +291,151 @@ async function generatePDF(options = {})
 		orientation: options.orientation || 'portrait',
 		unit: options.unit || 'pt',
 		format: options.format || 'a4',
+		putOnlyUsedFonts: true,
 	});
 
-	if(workerSelf.activeDocument.body)
+	// Page dimension helpers (A4 default points: 595.28 x 841.89)
+	const pageWidth = doc.internal.pageSize.getWidth();
+	const pageHeight = doc.internal.pageSize.getHeight();
+	const margin = 40; // 40pt margins
+	const maxWidth = pageWidth - (margin * 2);
+
+	let cursorX = margin;
+	let cursorY = margin + 20; // Initial top offset
+
+	/**
+	 * Helper to check and handle page overflow
+	 * @param {number} neededHeight
+	 */
+	function checkPageBreak(neededHeight)
 	{
-		const colorReset = workerSelf.activeDocument.createElement('style');
-		colorReset.innerText = `
-* {
-	-webkit-print-color-adjust: exact !important;
-	print-color-adjust: exact !important;
-	color-adjust: exact !important;
-}
-
-/* ==========================================================================
-1. Chrome Base Reset & Web-to-Print Settings
-========================================================================== */
-
-:root {
-  /* Default Web Mode Variables */
-  --bg-color: transparent;
-  --text-color: #202124;
-  --secondary-color: #5f6368;
-  --border-color: #dadce0;
-  --link-color: #1a0dab;
-  --code-bg: #f1f3f4;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-}
-
-/* Newsprint Theme Overrides */
-body.theme-newsprint {
-  --bg-color: transparent;
-  --text-color: #1a1a1a;
-  --secondary-color: #4a4a4a;
-  --border-color: #c8c2b0;
-  --link-color: #1a1a1a;
-  --code-bg: #e8e1cf;
-  --font-sans: "Georgia", "Times New Roman", "Times", serif;
-}
-
-/* Box Sizing & Layout Defaults */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-html {
-  -webkit-text-size-adjust: 100%;
-  tab-size: 4;
-}
-
-body {
-  margin: 0;
-  padding: 1rem;
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
-
-  /* FORCE Chrome to keep background colors & graphics when generating PDF */
-  -webkit-print-color-adjust: exact !important;
-  print-color-adjust: exact !important;
-  color-adjust: exact !important;
-}
-
-/* Newsprint Column Layout for Main Body Content */
-body.theme-newsprint main,
-body.theme-newsprint article {
-  column-count: 2;
-  column-gap: 20px;
-  column-rule: 1px solid var(--border-color);
-}
-
-/* ==========================================================================
-   2. Typography & Text Elements
-   ========================================================================== */
-
-h1, h2, h3, h4, h5, h6 {
-  margin-top: 1.2em;
-  margin-bottom: 0.5em;
-  color: var(--text-color);
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-h1 { font-size: 2em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
-h2 { font-size: 1.5em; }
-h3 { font-size: 1.25em; }
-h4 { font-size: 1em; }
-h5 { font-size: 0.875em; }
-h6 { font-size: 0.85em; color: var(--secondary-color); }
-
-p {
-  margin-top: 0;
-  margin-bottom: 1em;
-}
-
-small {
-  font-size: 80%;
-  color: var(--secondary-color);
-}
-
-b, strong {
-  font-weight: 600;
-}
-
-em, i {
-  font-style: italic;
-}
-
-mark {
-  background-color: #fce8e6;
-  color: var(--text-color);
-  padding: 0.1em 0.2em;
-}
-
-/* ==========================================================================
-   3. Links, Lists, and Blockquotes
-   ========================================================================== */
-
-a {
-  color: var(--link-color);
-  text-decoration: underline;
-  text-decoration-skip-ink: auto;
-}
-
-ul, ol {
-  margin-top: 0;
-  margin-bottom: 1em;
-  padding-left: 2em;
-}
-
-li {
-  margin-bottom: 0.25em;
-}
-
-blockquote {
-  margin: 1em 0;
-  padding: 0.5em 1em;
-  color: var(--secondary-color);
-  border-left: 4px solid var(--border-color);
-  background-color: transparent;
-}
-
-hr {
-  height: 0;
-  margin: 1.5em 0;
-  border: 0;
-  border-top: 1px solid var(--border-color);
-}
-
-/* ==========================================================================
-   4. Code, Preformatted Text & Media
-   ========================================================================== */
-
-code, kbd, samp, pre {
-  font-family: var(--font-mono);
-  font-size: 0.9em;
-}
-
-code {
-  padding: 0.2em 0.4em;
-  background-color: var(--code-bg);
-  border-radius: 3px;
-}
-
-pre {
-  margin-top: 0;
-  margin-bottom: 1em;
-  padding: 1em;
-  overflow: auto;
-  background-color: var(--code-bg);
-  border-radius: 4px;
-}
-
-pre code {
-  padding: 0;
-  background-color: transparent;
-}
-
-img, svg, video, canvas {
-  max-width: 100%;
-  height: auto;
-  display: block;
-}
-
-/* ==========================================================================
-   5. Tables & Forms
-   ========================================================================== */
-
-table {
-  width: 100%;
-  margin-bottom: 1em;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-th, td {
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-}
-
-th {
-  font-weight: 600;
-  background-color: var(--code-bg);
-}
-
-/* Form controls reset to look native/clean */
-input, button, textarea, select {
-  font-family: inherit;
-  font-size: inherit;
-  color: inherit;
-  margin: 0;
-}
-
-/* ==========================================================================
-   6. Chrome Print Engine Rules (@page & @media print)
-   ========================================================================== */
-
-@page {
-  /* Chrome default A4 page setup with 1cm margins */
-  size: A4;
-  margin: 10mm;
-}
-
-@media print {
-  body {
-    padding: 0;
-    background-color: var(--bg-color) !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  /* Prevent page cuts across elements */
-  p, blockquote, table, pre, figure, img, tr, .no-break {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* Keep headings attached to their following text */
-  h1, h2, h3, h4, h5, h6 {
-    break-after: avoid;
-    page-break-after: avoid;
-  }
-
-  /* Clean up printed links */
-  a {
-    text-decoration: none;
-  }
-}
-		`;
-
-		//if(activeDocument.body.childNodes.length)
-		//{
-		//activeDocument.body.insertBefore(colorReset, activeDocument.childNodes[0]);
-		//} else
+		if(cursorY + neededHeight > pageHeight - margin)
 		{
-			workerSelf.activeDocument.body.appendChild(colorReset);
+			doc.addPage();
+			cursorY = margin + 20;
 		}
 	}
-	const bodyText = workerSelf.activeDocument.body ? (workerSelf.activeDocument.body.textContent || '') : '';
 
-	if(false && workerSelf.activeDocument?.body)
+	/**
+	 * Recursive layout and render function for Happy DOM nodes
+	 * @param {Node | import('happy-dom').Node | HTMLElement | import('happy-dom').HTMLElement | ChildNode | HTMLBodyElement | HTMLHtmlElement | import('happy-dom').HTMLBodyElement | import('happy-dom').HTMLHtmlElement} node
+	 */
+	function renderNode(node)
 	{
-		debugger;
-		await doc.html(/** @type {any | HTMLElement}*/(workerSelf.activeDocument?.body.children[0]), {
-			callback: function (doc)
+		if(!node) return;
+
+		// Handle Text Nodes
+		if(node.nodeType === 3)
+		{ // Node.TEXT_NODE
+			const text = node.textContent ? node.textContent.trim() : '';
+			if(!text) return;
+
+			doc.setFont("helvetica", "normal");
+			doc.setFontSize(10);
+			doc.setTextColor(32, 33, 36);
+
+			const lines = doc.splitTextToSize(text, maxWidth);
+			const lineHeight = 14;
+
+			for(const line of lines)
 			{
-				//document.body.removeChild(container);
-			},
-			x: 0,
-			y: 0,
-			autoPaging: 'text',
-			html2canvas: {
-				// Chrome's default print background flags
-				backgroundColor: 'transparent',
-				scale: 0.75, // Adjust scale to fit A4 width
-				onclone: (clonedDoc) =>
-				{
-					// Force Chrome print color retention rules on the clone
-					//clonedDoc.body.style.webkitPrintColorAdjust = 'exact';
-					clonedDoc.body.style.printColorAdjust = 'exact';
-				}
+				checkPageBreak(lineHeight);
+				doc.text(line, cursorX, cursorY);
+				cursorY += lineHeight;
 			}
-		});
+			return;
+		}
+
+		// Handle Element Nodes
+		if(node.nodeType === 1)
+		{ // Node.ELEMENT_NODE
+			const tagName = 'tagName' in node ? node.tagName.toLowerCase() : node.constructor?.name?.toLowerCase();
+
+			// Skip style/script or hidden tags
+			if(['style', 'script', 'head', 'meta', 'link'].includes(tagName))
+			{
+				return;
+			}
+
+			// Apply tag-specific styling and layout rules
+			let prevFontSize = doc.getFontSize();
+			let prevFontStyling = 'normal'; // doc.getFontStyle ? doc.getFontStyle() : 'normal';
+
+			switch(tagName)
+			{
+				case 'h1':
+					checkPageBreak(40);
+					doc.setFont("helvetica", "bold");
+					doc.setFontSize(22);
+					cursorY += 10;
+					break;
+				case 'h2':
+					checkPageBreak(35);
+					doc.setFont("helvetica", "bold");
+					doc.setFontSize(18);
+					cursorY += 8;
+					break;
+				case 'h3':
+					checkPageBreak(30);
+					doc.setFont("helvetica", "bold");
+					doc.setFontSize(14);
+					cursorY += 6;
+					break;
+				case 'p':
+				case 'div':
+					cursorY += 4;
+					break;
+				case 'hr':
+					checkPageBreak(15);
+					//doc.setDrawModel?.();
+					doc.setLineWidth(1);
+					doc.setDrawColor(218, 220, 224);
+					doc.line(cursorX, cursorY, pageWidth - margin, cursorY);
+					cursorY += 15;
+					return;
+				case 'strong':
+				case 'b':
+					doc.setFont("helvetica", "bold");
+					break;
+				case 'em':
+				case 'i':
+					doc.setFont("helvetica", "italic");
+					break;
+				default:
+					break;
+			}
+
+			// Recurse child nodes
+			for(const child of node.childNodes)
+			{
+				renderNode(child);
+			}
+
+			// Post-element spacing for block elements
+			if(['h1', 'h2', 'h3', 'p', 'div', 'ul', 'ol', 'blockquote'].includes(tagName))
+			{
+				cursorY += 6;
+			}
+
+			// Restore font defaults
+			doc.setFont("helvetica", prevFontStyling);
+			doc.setFontSize(prevFontSize);
+		}
+	}
+
+	// Start rendering from body if available, otherwise whole document
+	/** @type {import('happy-dom').HTMLBodyElement} */
+	const rootTarget = (workerSelf.activeDocument.body
+		?? workerSelf.activeDocument.documentElement);
+	if(rootTarget)
+	{
+		renderNode(rootTarget);
 	} else
 	{
-		// Format body content into PDF lines
-		const lines = doc.splitTextToSize(bodyText, 500);
-		doc.text(lines, 40, 60);
+		// Fallback to text extraction if no structural elements found
+		const bodyText = workerSelf.activeDocument.textContent || '';
+		const lines = doc.splitTextToSize(bodyText, maxWidth);
+		doc.text(lines, cursorX, cursorY);
 	}
 
 	return doc.output('arraybuffer');
@@ -593,18 +452,30 @@ workerSelf.onmessage = async (event) =>
 	switch(type)
 	{
 		case 'INIT': {
-			const { html, url, canvas, engine } = payload;
+			const { html, url, canvas, engine, height, width } = payload;
 			if(canvas)
 			{
 				workerSelf.offscreenCanvas = canvas;
 				workerSelf.canvasCtx = workerSelf.offscreenCanvas?.getContext('2d');
 			}
 			createVirtualDOM(html, url, engine);
+			// give the page time to settle
+			await new Promise(resolve => setTimeout(resolve, 2000));
+			if(typeof height === 'number')
+			{
+				workerSelf.innerHeight = height;
+				workerSelf.window.innerHeight = height;
+			}
+			if(typeof width === 'number')
+			{
+				workerSelf.innerWidth = width;
+				workerSelf.window.innerWidth = width;
+			}
 			const bitmap = await renderToCanvas();
 			let pdf;
 			if(!bitmap)
 			{
-				pdf = await generatePDF();
+				pdf = await generatePDF(height && width ? { format: [width, height], unit: 'px' } : {});
 			}
 
 			workerSelf.postMessage(pdf

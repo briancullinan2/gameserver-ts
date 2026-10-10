@@ -1,0 +1,295 @@
+* {
+	-webkit-print-color-adjust: exact !important;
+	print-color-adjust: exact !important;
+	color-adjust: exact !important;
+}
+
+/* ==========================================================================
+1. Chrome Base Reset & Web-to-Print Settings
+========================================================================== */
+
+:root {
+	/* Default Web Mode Variables */
+	--bg-color: transparent;
+	--text-color: #202124;
+	--secondary-color: #5f6368;
+	--border-color: #dadce0;
+	--link-color: #1a0dab;
+	--code-bg: #f1f3f4;
+	--font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	--font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+/* Newsprint Theme Overrides */
+body.theme-newsprint {
+	--bg-color: transparent;
+	--text-color: #1a1a1a;
+	--secondary-color: #4a4a4a;
+	--border-color: #c8c2b0;
+	--link-color: #1a1a1a;
+	--code-bg: #e8e1cf;
+	--font-sans: "Georgia", "Times New Roman", "Times", serif;
+}
+
+/* Box Sizing & Layout Defaults */
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	-webkit-text-size-adjust: 100%;
+	tab-size: 4;
+}
+
+body {
+	margin: 0;
+	padding: 1rem;
+	background-color: var(--bg-color);
+	color: var(--text-color);
+	font-family: var(--font-sans);
+	font-size: 14px;
+	line-height: 1.5;
+
+	/* FORCE Chrome to keep background colors & graphics when generating PDF */
+	-webkit-print-color-adjust: exact !important;
+	print-color-adjust: exact !important;
+	color-adjust: exact !important;
+}
+
+/* Newsprint Column Layout for Main Body Content */
+body.theme-newsprint main,
+body.theme-newsprint article {
+	column-count: 2;
+	column-gap: 20px;
+	column-rule: 1px solid var(--border-color);
+}
+
+/* ==========================================================================
+   2. Typography & Text Elements
+   ========================================================================== */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	margin-top: 1.2em;
+	margin-bottom: 0.5em;
+	color: var(--text-color);
+	font-weight: 600;
+	line-height: 1.25;
+}
+
+h1 {
+	font-size: 2em;
+	border-bottom: 1px solid var(--border-color);
+	padding-bottom: 0.3em;
+}
+
+h2 {
+	font-size: 1.5em;
+}
+
+h3 {
+	font-size: 1.25em;
+}
+
+h4 {
+	font-size: 1em;
+}
+
+h5 {
+	font-size: 0.875em;
+}
+
+h6 {
+	font-size: 0.85em;
+	color: var(--secondary-color);
+}
+
+p {
+	margin-top: 0;
+	margin-bottom: 1em;
+}
+
+small {
+	font-size: 80%;
+	color: var(--secondary-color);
+}
+
+b,
+strong {
+	font-weight: 600;
+}
+
+em,
+i {
+	font-style: italic;
+}
+
+mark {
+	background-color: #fce8e6;
+	color: var(--text-color);
+	padding: 0.1em 0.2em;
+}
+
+/* ==========================================================================
+   3. Links, Lists, and Blockquotes
+   ========================================================================== */
+
+a {
+	color: var(--link-color);
+	text-decoration: underline;
+	text-decoration-skip-ink: auto;
+}
+
+ul,
+ol {
+	margin-top: 0;
+	margin-bottom: 1em;
+	padding-left: 2em;
+}
+
+li {
+	margin-bottom: 0.25em;
+}
+
+blockquote {
+	margin: 1em 0;
+	padding: 0.5em 1em;
+	color: var(--secondary-color);
+	border-left: 4px solid var(--border-color);
+	background-color: transparent;
+}
+
+hr {
+	height: 0;
+	margin: 1.5em 0;
+	border: 0;
+	border-top: 1px solid var(--border-color);
+}
+
+/* ==========================================================================
+   4. Code, Preformatted Text & Media
+   ========================================================================== */
+
+code,
+kbd,
+samp,
+pre {
+	font-family: var(--font-mono);
+	font-size: 0.9em;
+}
+
+code {
+	padding: 0.2em 0.4em;
+	background-color: var(--code-bg);
+	border-radius: 3px;
+}
+
+pre {
+	margin-top: 0;
+	margin-bottom: 1em;
+	padding: 1em;
+	overflow: auto;
+	background-color: var(--code-bg);
+	border-radius: 4px;
+}
+
+pre code {
+	padding: 0;
+	background-color: transparent;
+}
+
+img,
+svg,
+video,
+canvas {
+	max-width: 100%;
+	height: auto;
+	display: block;
+}
+
+/* ==========================================================================
+   5. Tables & Forms
+   ========================================================================== */
+
+table {
+	width: 100%;
+	margin-bottom: 1em;
+	border-collapse: collapse;
+	text-align: left;
+}
+
+th,
+td {
+	padding: 8px 12px;
+	border: 1px solid var(--border-color);
+}
+
+th {
+	font-weight: 600;
+	background-color: var(--code-bg);
+}
+
+/* Form controls reset to look native/clean */
+input,
+button,
+textarea,
+select {
+	font-family: inherit;
+	font-size: inherit;
+	color: inherit;
+	margin: 0;
+}
+
+/* ==========================================================================
+   6. Chrome Print Engine Rules (@page & @media print)
+   ========================================================================== */
+
+@page {
+	/* Chrome default A4 page setup with 1cm margins */
+	size: A4;
+	margin: 10mm;
+}
+
+@media print {
+	body {
+		padding: 0;
+		background-color: var(--bg-color) !important;
+		-webkit-print-color-adjust: exact !important;
+		print-color-adjust: exact !important;
+	}
+
+	/* Prevent page cuts across elements */
+	p,
+	blockquote,
+	table,
+	pre,
+	figure,
+	img,
+	tr,
+	.no-break {
+		break-inside: avoid;
+		page-break-inside: avoid;
+	}
+
+	/* Keep headings attached to their following text */
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		break-after: avoid;
+		page-break-after: avoid;
+	}
+
+	/* Clean up printed links */
+	a {
+		text-decoration: none;
+	}
+}

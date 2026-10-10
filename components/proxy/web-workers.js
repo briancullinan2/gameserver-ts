@@ -9,7 +9,7 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 const { Server } = require('./socks.server.js');
 const Stream = require('stream');
-const { respondRequest } = require('./web-middle.js');
+const { respondRequest, middleware } = require('./web-middle.js');
 const startMasterServer = require('./master.js');
 
 // =============================================================================
@@ -470,7 +470,20 @@ async function handleHttpRequestStub(msg, workerId)
 	// 	headers: { 'Content-Type': 'text/plain' },
 	// 	body: `[HTTP Worker ${workerId}] Handled ${msg.method} request for ${msg.url}`
 	// };
-	return await respondRequest(msg);
+
+	const pre = middleware(msg);
+	if(msg.method === 'OPTIONS')
+	{
+		return pre;
+	}
+
+	/** @type {HttpResponseMessage} */
+	const response = await respondRequest(msg);
+	if(typeof response === 'object')
+	{
+		Object.assign(response.headers ?? {}, pre.headers);
+	}
+	return response;
 }
 
 /**

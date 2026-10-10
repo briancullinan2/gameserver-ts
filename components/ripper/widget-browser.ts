@@ -2,14 +2,16 @@ import { Widget } from '@lumino/widgets';
 import { Message } from '@lumino/messaging';
 import type { LuminoLayoutWindow } from '../bundle/lumino.d';
 import type { GlobalToolbarsWindow, LuminoMenuWindow, RepositorySettingsWindow } from '../bundle/menu.d';
-import { ISocketMessage, WebSocketMonitor } from '../rcon/websocket';
+import type { ISocketMessage, WebSocketMonitor } from '../rcon/websocket';
 import type { SettingConfig } from '../bundle/settings';
 import { VirtualRendererManager } from './widget-virtual';
-import type * as pdfjsLib from './pdf.min.mjs';
+import type * as pdfjsLib from 'pdfjs-dist';
 import './pdf.min.mjs';
+import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 
 const widgetSelf: GlobalToolbarsWindow & LuminoLayoutWindow & LuminoMenuWindow
 	& RepositorySettingsWindow & {
+		WebSocketMonitor: typeof WebSocketMonitor,
 		pdfjsLib: typeof pdfjsLib;
 	} = self as unknown as any;
 
@@ -53,6 +55,9 @@ export class BrowserWidget extends Widget
 	private previewContext?: CanvasRenderingContext2D | null;
 	private activeEngine: 'happy-dom' | 'jsdom' | 'none' = 'none';
 	private canvasSent: boolean = false;
+	private initialize?: Promise<void> | undefined;
+	private textLayer?: HTMLDivElement;
+	private rendering?: Promise<void>;
 
 	constructor(title?: string)
 	{
@@ -64,7 +69,17 @@ export class BrowserWidget extends Widget
 		this.title.closable = true;
 
 		this.buildLayout();
-		WebSocketMonitor.initQ3Socks5Networking();
+		if(!widgetSelf.WebSocketMonitor)
+		{
+			this.initialize = widgetSelf.preloadDependencies?.(['/components/rcon/websocket.ts'])
+				.then(() =>
+					widgetSelf.WebSocketMonitor.initQ3Socks5Networking()
+				);
+		}
+		else
+		{
+			widgetSelf.WebSocketMonitor.initQ3Socks5Networking();
+		}
 	}
 
 	/* ------------------------------------------------------------------ */
@@ -132,9 +147,19 @@ export class BrowserWidget extends Widget
 			this.previewContext = this.previewCanvas.getContext('2d');
 			this.offscreenCanvas = document.createElement('canvas');
 			this.offscreenCanvas.className = 'sc-preview-canvas';
-
+			this.textLayer = document.createElement('div');
+			this.textLayer.className = 'textLayer';
+			this.textLayer.style.position = 'absolute';
+			this.textLayer.style.left = '0';
+			this.textLayer.style.right = '0';
+			this.textLayer.style.bottom = '0';
+			this.textLayer.style.top = '0';
+			this.textLayer.style.overflow = 'hidden';
+			this.textLayer.style.opacity = '0.2';
+			this.textLayer.style.lineHeight = '1.0';
 			this.previewContainer.appendChild(this.offscreenCanvas);
 			this.previewContainer.appendChild(this.previewCanvas);
+			this.previewContainer.appendChild(this.textLayer);
 		}
 
 		this.node.appendChild(this.previewContainer);
@@ -217,62 +242,112 @@ export class BrowserWidget extends Widget
 
 	// 1. Add a class property to track the active render task
 	private renderTask: any = null;
-
-	private async loadPDF(data: ArrayBuffer)
+	private async loadPDF(data: ArrayBuffer): Promise<void>
 	{
-		widgetSelf.pdfjsLib.GlobalWorkerOptions.workerSrc =
-			'/components/ripper/pdf.worker.min.mjs';
-
-		// 2. If a render is currently in progress, cancel it!
-		if(this.renderTask)
+		// If a render is already in progress, wait for it to finish first
+		if(this.rendering)
 		{
-			this.renderTask.cancel();
-			this.renderTask = null;
+			await this.rendering;
 		}
 
-		try
+		// Create and capture the rendering promise immediately to lock out concurrent calls
+		this.rendering = (async () =>
 		{
-			const loadingTask = widgetSelf.pdfjsLib.getDocument({ data });
-			const pdf = await loadingTask.promise;
+			widgetSelf.pdfjsLib.GlobalWorkerOptions.workerSrc =
+				'/components/ripper/pdf.worker.min.mjs';
 
-			console.log('PDF loaded');
-
-			const pageNumber = 1;
-			const page = await pdf.getPage(pageNumber);
-
-			console.log('Page loaded');
-
-			const scale = 1.5;
-			const viewport = page.getViewport({ scale: scale });
-
-			const renderContext = {
-				canvasContext: this.previewContext,
-				viewport: viewport
-			};
-
-			// 3. Store the render task reference
-			this.renderTask = page.render(renderContext);
-
-			// 4. Await the render task promise directly
-			await this.renderTask.promise;
-			console.log('Page rendered');
-
-		} catch(reason: any)
-		{
-			// 5. PDF.js throws a specific exception when a task is canceled manually
-			if(reason?.name === 'RenderingCancelledException')
+			if(this.renderTask)
 			{
-				console.log('Previous rendering task canceled');
-			} else
-			{
-				console.error('PDF loading error:', reason);
+				this.renderTask.cancel();
+				this.renderTask = null;
 			}
-		} finally
-		{
-			this.renderTask = null;
-		}
+
+			try
+			{
+				const loadingTask: pdfjsLib.PDFDocumentLoadingTask = widgetSelf.pdfjsLib.getDocument({
+					data,
+					cMapUrl: '/components/ripper/cmaps/',
+					cMapPacked: true,
+				});
+				const pdf = await loadingTask.promise;
+
+				console.log('PDF loaded');
+				const pageNumber = 1;
+				const page = await pdf.getPage(pageNumber);
+
+				console.log('Page loaded');
+				const canvas = this.previewContext?.canvas;
+				if(!canvas || !this.previewContext) return;
+
+				const unscaledViewport = page.getViewport({ scale: 1.0 });
+				const targetScale = canvas.clientWidth / unscaledViewport.width;
+				const viewport = page.getViewport({ scale: targetScale });
+
+				const outputScale = window.devicePixelRatio || 1;
+				canvas.width = Math.floor(viewport.width * outputScale);
+				canvas.height = Math.floor(viewport.height * outputScale);
+
+				const transform = outputScale !== 1
+					? [outputScale, 0, 0, outputScale, 0, 0]
+					: undefined;
+
+				const renderContext: RenderParameters = {
+					canvas: canvas,
+					canvasContext: this.previewContext,
+					viewport: viewport,
+					transform: transform
+				};
+
+				this.renderTask = page.render(renderContext);
+				await this.renderTask.promise;
+				console.log('Page rendered naturally');
+
+				await this.renderPDFText(page);
+
+			} catch(reason: any)
+			{
+				if(reason?.name === 'RenderingCancelledException')
+				{
+					console.log('Previous rendering task canceled');
+				} else
+				{
+					console.error('PDF loading error:', reason);
+				}
+			} finally
+			{
+				this.renderTask = null;
+			}
+		})();
+
+		return this.rendering;
 	}
 
+	private async renderPDFText(page: pdfjsLib.PDFPageProxy)
+	{
+		if(!this.textLayer) return;
+		this.textLayer.innerHTML = '';
+
+		// 1. Calculate scale to match your desired dimensions or container size
+		//const containerWidth = this.textLayer.clientWidth || 600;
+		//const unscaledViewport = page.getViewport({ scale: 1.0 });
+
+		// Example: factoring in custom margin spacing if needed
+		//const margin = 0; //40;
+		//const targetWidth = containerWidth - (margin * 2);
+		//const scale = targetWidth / unscaledViewport.width;
+
+		const viewport = page.getViewport(); //({ scale: scale });
+
+		// 2. Initialize and render the text layer
+		const textLayer = new widgetSelf.pdfjsLib.TextLayer({
+			textContentSource: await page.streamTextContent(),
+			viewport: viewport,
+			container: this.textLayer,
+		});
+
+		await textLayer.render();
+		console.log('Text layer rendered');
+	}
 
 	private static LOADING_DOCUMENT = '<html><body style="background:#1e1e1e;color:#888;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">Loading ${url}...</body></html>';
 
@@ -299,10 +374,10 @@ export class BrowserWidget extends Widget
 		const parsed = new URL(url);
 
 		// Adapting sendQ3UDPMessage to route HTTP request through WebSocket middleware
-		if(typeof WebSocketMonitor.sendHTTPRequest === 'function')
+		if(typeof widgetSelf.WebSocketMonitor.sendHTTPRequest === 'function')
 		{
 			const parsedPort = parseInt(parsed.port);
-			WebSocketMonitor.sendHTTPRequest(parsed.hostname, !isNaN(parsedPort) ? parsedPort : (parsed.protocol.includes('https') ? 443 : 80), payload);
+			widgetSelf.WebSocketMonitor.sendHTTPRequest(parsed.hostname, !isNaN(parsedPort) ? parsedPort : (parsed.protocol.includes('https') ? 443 : 80), payload);
 		}
 	}
 
@@ -379,7 +454,7 @@ export class BrowserWidget extends Widget
 			});
 			if(pdf instanceof ArrayBuffer)
 			{
-				this.loadPDF(pdf);
+				this.rendering = this.loadPDF(pdf);
 			}
 		}
 	}
@@ -496,10 +571,14 @@ export class BrowserWidget extends Widget
 	/* ------------------------------------------------------------------ */
 	/* 3. Lumino Lifecycle & Master List Connections                      */
 	/* ------------------------------------------------------------------ */
-	protected override onAfterAttach(msg: Message): void
+	protected override async onAfterAttach(msg: Message): Promise<void>
 	{
 		super.onAfterAttach(msg);
-		WebSocketMonitor.serverResponse.connect(this.subResponse);
+		if(this.initialize)
+		{
+			await this.initialize;
+		}
+		widgetSelf.WebSocketMonitor.serverResponse.connect(this.subResponse);
 		// this.openMasters();
 		requestAnimationFrame(() =>
 		{
@@ -517,7 +596,7 @@ export class BrowserWidget extends Widget
 
 	protected override onBeforeDetach(msg: Message): void
 	{
-		WebSocketMonitor.serverResponse.disconnect(this.subResponse);
+		widgetSelf.WebSocketMonitor.serverResponse.disconnect(this.subResponse);
 		// this.mastersSidebar?.addServer.disconnect(this.subAdd);
 		// this.mastersSidebar?.removeServer.disconnect(this.subRemove);
 		// this.mastersSidebar?.serverSelected.disconnect(this.subSelect);
