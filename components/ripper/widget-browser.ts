@@ -8,6 +8,7 @@ import type { VirtualRendererManager } from './widget-virtual';
 import type * as pdfjsLib from 'pdfjs-dist';
 import './pdf.min.mjs';
 import { RenderParameters } from 'pdfjs-dist/types/src/display/api';
+import { DownloadWidget } from './widget-downloads';
 
 const widgetSelf: GlobalToolbarsWindow & LuminoLayoutWindow & LuminoMenuWindow
 	& RepositorySettingsWindow & {
@@ -47,7 +48,7 @@ export class BrowserWidget extends Widget
 	private offscreenCanvas?: HTMLCanvasElement;
 
 	// Sidebar & Signals
-	// private mastersSidebar?: MasterListWidget;
+	private downloadSidebar?: DownloadWidget;
 	// private subSelect: (_: any, args: IServerSelectedArgs) => void = (_, args) => this.selectServer(args.item);
 	// private subAdd: (_: any, args: IAddServerArgs) => void = (_, args) => this.addServer(args.item);
 	// private subRemove: (_: any, args: IRemoveServerArgs) => void = (_, args) => this.removeServer(args.item);
@@ -611,7 +612,7 @@ export class BrowserWidget extends Widget
 			await this.initialize;
 		}
 		widgetSelf.WebSocketMonitor.serverResponse.connect(this.subResponse);
-		// this.openMasters();
+		this.openDownloads();
 		requestAnimationFrame(() =>
 		{
 
@@ -634,51 +635,51 @@ export class BrowserWidget extends Widget
 		// this.mastersSidebar?.addServer.disconnect(this.subAdd);
 		// this.mastersSidebar?.removeServer.disconnect(this.subRemove);
 		// this.mastersSidebar?.serverSelected.disconnect(this.subSelect);
-		// this.mastersSidebar?.close();
+		this.downloadSidebar?.close();
 		super.onBeforeDetach(msg);
 	}
 
 	protected override onBeforeHide(msg: Message): void
 	{
 		widgetSelf.WebSocketMonitor.serverResponse.disconnect(this.subResponse);
-		// this.mastersSidebar?.close();
+		this.downloadSidebar?.close();
 		super.onBeforeHide(msg);
 	}
 
 	protected override onAfterShow(msg: Message): void
 	{
 		super.onAfterShow(msg);
-		// this.openMasters();
+		this.openDownloads();
 		requestAnimationFrame(() =>
 		{
 			this.navigate();
 		});
 	}
 
-	// private openMasters(): void
-	// {
-	// 	const that = this;
-	// 	if(!this.mastersSidebar)
-	// 	{
-	// 		this.mastersSidebar = new MasterListWidget();
-	// 		this.mastersSidebar.serverSelected.connect(this.subSelect);
-	// 		this.mastersSidebar.removeServer.connect(this.subRemove);
-	// 		this.mastersSidebar.addServer.connect(this.subAdd);
-	// 	}
-	// 	setTimeout(() =>
-	// 	{
-	// 		if(this.mastersSidebar && !this.mastersSidebar.isAttached)
-	// 		{
-	// 			if(widgetSelf.mainDock && widgetSelf.LayoutAdjuster && that.mastersSidebar)
-	// 			{
-	// 				widgetSelf.LayoutAdjuster?.addOptimalWidgetLayout(widgetSelf.mainDock, that.mastersSidebar, {
-	// 					type: 'outline',
-	// 					projectId: that.mastersSidebar?.constructor.name
-	// 				});
-	// 			}
-	// 		}
-	// 	}, 300);
-	// }
+	private openDownloads(): void
+	{
+		const that = this;
+		if(!this.downloadSidebar)
+		{
+			this.downloadSidebar = new DownloadWidget();
+			// this.mastersSidebar.serverSelected.connect(this.subSelect);
+			// this.mastersSidebar.removeServer.connect(this.subRemove);
+			// this.mastersSidebar.addServer.connect(this.subAdd);
+		}
+		setTimeout(() =>
+		{
+			if(this.downloadSidebar && !this.downloadSidebar.isAttached)
+			{
+				if(widgetSelf.mainDock && widgetSelf.LayoutAdjuster && that.downloadSidebar)
+				{
+					widgetSelf.LayoutAdjuster?.addOptimalWidgetLayout(widgetSelf.mainDock, that.downloadSidebar, {
+						type: 'outline',
+						projectId: that.downloadSidebar?.constructor.name
+					});
+				}
+			}
+		}, 300);
+	}
 
 	private toggleCurrentFavorite(): void
 	{

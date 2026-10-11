@@ -160,7 +160,8 @@ This platform merges two core server components into a zero-install cloud arcade
 * multiple browser renderers, PDF Print (Filtered), HTML Remote (Worker), IFrame (Insecure)
 * time machine like archive.org showing page changes over time and the last previous cached version if offline or missing
 * generate .har files from browser requests
-
+* links between environments, clicking a different desktop changes browser tabs because they are related.
+* import task manager from parrot pi
 
 
 ![alt text](<Screenshot 2026-10-06 120734.png>) ![alt text](<Screenshot 2026-10-07 182604.png>)

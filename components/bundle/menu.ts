@@ -126,6 +126,14 @@ export const MODULE_REGISTRY: Record<string, ComponentRoute> = {
 menuSelf.MODULE_REGISTRY = MODULE_REGISTRY;
 
 export const TOOLS_REGISTRY: Record<string, ComponentRoute> = {
+	'folders': {
+		label: 'Storage & Directory Wizard',
+		url: './components/assets/widget-settings.ts',
+		className: 'FolderWizardWidget',
+		iconClass: 'fas fa-folder-tree',
+		subtext: 'Powered by cross-platform OS special path presets, File System Access API directory pickers, and middleware watcher synchronization.',
+		description: 'An interactive configuration wizard to manage virtual database folder mappings, monitor local storage availability, and sync directories with backend watchers.'
+	},
 	'ripper': {
 		label: 'Games Finder',
 		url: './components/tools/widget-games.ts',
@@ -173,6 +181,14 @@ export const TOOLS_REGISTRY: Record<string, ComponentRoute> = {
 		iconClass: 'bx bx-radar',
 		subtext: 'Monitors WebSocket/UDP bridge health, latency pulse telemetry, tunnel handshake protocols, and configuration setup routines.',
 		description: 'A system diagnostic dashboard providing live network proxy status, active tunnel latency metrics, connection logs, and client setup instructions.'
+	},
+	'hosting': {
+		label: 'Hosting Administration',
+		url: './components/proxy/widget-hosting.ts',
+		className: 'HostingWidget',
+		iconClass: 'bi bi-hdd-network',
+		subtext: 'Powered by Cloudflare API tunnels, automated status polling intervals, and background service runner integrations.',
+		description: 'An administration control panel for monitoring live HTTP hosting status, managing Cloudflare reverse tunnels, and configuring local background service workers.'
 	},
 	'shaders': {
 		label: 'Shader Analyzer',

@@ -27,28 +27,29 @@ const indexMiddleware = serveIndex(TARGET_DIR, {
  * Custom Dynamic Health-Checking Middleware
  * Validates drive availability per request before executing serve-index / serve-static
  *
- * @param {IncomingMessage} req
- * @param {ServerResponse} res
- * @param {Function} next
- * @returns {void | any}
+ * @param {import('../proxy/web-workers').HttpRequestMessage} req
+ * @returns {import('../proxy/web-workers').HttpResponseMessage | undefined}
  */
-function removableStorageMiddleware(req, res, next)
+function removableStorageMiddleware(req)
 {
 	const originalUrl = req.url || '';
 
 	// Only intercept requests starting with /clipart
 	if(!originalUrl.startsWith('/clipart'))
 	{
-		return next();
+		return;
 	}
 
 	// 1. Fix missing trailing slash on directory root (/clipart -> /clipart/)
 	// serve-index will 404 or emit broken links if accessed without a trailing slash
 	if(originalUrl === '/clipart')
 	{
-		res.statusCode = 301;
-		res.setHeader('Location', '/clipart/');
-		return res.end();
+		return {
+			statusCode: 301,
+			headers: {
+				'Location': '/clipart/'
+			}
+		};
 	}
 
 	// Check if the drive/directory exists on every incoming request
@@ -56,13 +57,17 @@ function removableStorageMiddleware(req, res, next)
 	{
 		if(!fs.existsSync(TARGET_DIR))
 		{
-			res.statusCode = 503;
-			res.setHeader('Content-Type', 'application/json');
-			return res.end(JSON.stringify({
-				error: 'Storage Unavailable',
-				message: 'The removable storage device is currently disconnected or unmounted.',
-				timestamp: new Date().toISOString()
-			}));
+			return {
+				statusCode: 503,
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					error: 'Storage Unavailable',
+					message: 'The removable storage device is currently disconnected or unmounted.',
+					timestamp: new Date().toISOString()
+				})
+			};
 		}
 
 		// Validate read permissions/accessibility
@@ -74,13 +79,18 @@ function removableStorageMiddleware(req, res, next)
 		{
 			console.warn(`[Storage Warning] Drive access failed: ${err.message}`);
 		}
-		res.statusCode = 503;
-		res.setHeader('Content-Type', 'application/json');
-		return res.end(JSON.stringify({
-			error: 'Storage I/O Error',
-			message: 'Removable drive is attached but unreadable.',
-			timestamp: new Date().toISOString()
-		}));
+
+		return {
+			statusCode: 503,
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				error: 'Storage I/O Error',
+				message: 'Removable drive is attached but unreadable.',
+				timestamp: new Date().toISOString()
+			})
+		};
 	}
 
 	// 2. STRIP THE ROUTE PREFIX
@@ -94,13 +104,13 @@ function removableStorageMiddleware(req, res, next)
 	console.log(`[Storage] Serving ${originalUrl} -> ${path.join(TARGET_DIR, strippedUrl)}`);
 
 	// Drive is connected and readable: pass through static first, then index
-	staticMiddleware(req, res, () =>
+	// TODO: replace with layered FS
+	staticMiddleware(/** @type {any} */(req), /** @type {any} */({}), () =>
 	{
-		indexMiddleware(req, res, (/** @type {any} */ err) =>
+		indexMiddleware(/** @type {any} */(req), /** @type {any} */({}), (/** @type {any} */ err) =>
 		{
 			// Restore req.url in case subsequent downstream middlewares read it
 			req.url = originalUrl;
-			next(err);
 		});
 	});
 }

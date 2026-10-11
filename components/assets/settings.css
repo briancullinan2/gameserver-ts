@@ -1,0 +1,238 @@
+.lm-FolderWizard {
+	display: flex;
+	flex-direction: column;
+	background-color: var(--jp-layout-color1, #18181b);
+	color: var(--jp-ui-font-color1, #f4f4f5);
+	font-family: var(--jp-ui-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
+	font-size: 13px;
+	height: 100%;
+	overflow: hidden;
+	user-select: none;
+}
+
+/* Header & Middleware Bar */
+.lm-FolderWizard-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px;
+	background-color: var(--jp-layout-color2, #202024);
+	border-bottom: 1px solid var(--jp-border-color2, #27272a);
+}
+
+.lm-FolderWizard-title {
+	font-weight: 600;
+	font-size: 14px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.lm-FolderWizard-middlewareControl {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	background: var(--jp-layout-color1, #18181b);
+	padding: 6px 10px;
+	border-radius: 6px;
+	border: 1px solid var(--jp-border-color2, #27272a);
+}
+
+.lm-FolderWizard-statusDot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background-color: #71717a;
+	box-shadow: 0 0 0 2px rgba(113, 113, 122, 0.2);
+	transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.lm-FolderWizard-statusDot.is-connected {
+	background-color: #22c55e;
+	box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+}
+
+.lm-FolderWizard-statusDot.is-error {
+	background-color: #ef4444;
+	box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+}
+
+/* Action Controls Toolbar */
+.lm-FolderWizard-toolbar {
+	display: flex;
+	gap: 8px;
+	padding: 12px 16px;
+	background-color: var(--jp-layout-color2, #1f1f23);
+	border-bottom: 1px solid var(--jp-border-color2, #27272a);
+	flex-wrap: wrap;
+}
+
+.lm-FolderWizard-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	background-color: var(--jp-layout-color3, #27272a);
+	color: var(--jp-ui-font-color1, #f4f4f5);
+	border: 1px solid var(--jp-border-color3, #3f3f46);
+	padding: 6px 12px;
+	border-radius: 4px;
+	font-size: 12px;
+	font-weight: 500;
+	cursor: pointer;
+	transition: background-color 0.15s, border-color 0.15s;
+}
+
+.lm-FolderWizard-btn:hover {
+	background-color: #3f3f46;
+	border-color: #52525b;
+}
+
+.lm-FolderWizard-btn.primary {
+	background-color: #0284c7;
+	border-color: #0369a1;
+}
+
+.lm-FolderWizard-btn.primary:hover {
+	background-color: #0369a1;
+}
+
+/* Main Folder List Container */
+.lm-FolderWizard-listContainer {
+	flex: 1;
+	overflow-y: auto;
+	padding: 8px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.lm-FolderWizard-card {
+	background-color: var(--jp-layout-color2, #202024);
+	border: 1px solid var(--jp-border-color2, #27272a);
+	border-radius: 6px;
+	overflow: hidden;
+	transition: border-color 0.15s;
+}
+
+.lm-FolderWizard-card:hover {
+	border-color: #3f3f46;
+}
+
+.lm-FolderWizard-card.is-removable-missing {
+	opacity: 0.5;
+	border-style: dashed;
+	border-color: #ef4444;
+}
+
+.lm-FolderWizard-cardHeader {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 10px 12px;
+}
+
+.lm-FolderWizard-cardInfo {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	flex: 1;
+	min-width: 0;
+}
+
+.lm-FolderWizard-alias {
+	font-weight: 600;
+	font-size: 13px;
+	color: #38bdf8;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.lm-FolderWizard-desc {
+	font-size: 11px;
+	color: #a1a1aa;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.lm-FolderWizard-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.lm-FolderWizard-iconBtn {
+	background: transparent;
+	border: none;
+	color: #a1a1aa;
+	cursor: pointer;
+	padding: 4px;
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.lm-FolderWizard-iconBtn:hover {
+	background-color: rgba(255, 255, 255, 0.08);
+	color: #f4f4f5;
+}
+
+/* Expandable Settings Detail Panel */
+.lm-FolderWizard-detailsPanel {
+	background-color: rgba(0, 0, 0, 0.2);
+	border-top: 1px solid var(--jp-border-color2, #27272a);
+	padding: 10px 12px;
+	font-size: 11px;
+	display: none;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.lm-FolderWizard-card.is-expanded .lm-FolderWizard-detailsPanel {
+	display: flex;
+}
+
+.lm-FolderWizard-detailGrid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px;
+}
+
+.lm-FolderWizard-detailItem {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.lm-FolderWizard-detailLabel {
+	color: #71717a;
+	text-transform: uppercase;
+	font-size: 9px;
+	letter-spacing: 0.5px;
+}
+
+.lm-FolderWizard-detailValue {
+	color: #d4d4d8;
+	font-family: monospace;
+}
+
+.lm-FolderWizard-linkRow {
+	display: flex;
+	gap: 12px;
+	margin-top: 4px;
+}
+
+.lm-FolderWizard-link {
+	color: #38bdf8;
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.lm-FolderWizard-link:hover {
+	text-decoration: underline;
+}

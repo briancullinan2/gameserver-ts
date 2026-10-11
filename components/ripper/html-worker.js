@@ -335,7 +335,6 @@ workerSelf.onmessage = async (event) =>
 					await navigate(el.src);
 					// TODO: report browser files back to front end for network traffic monitor
 				}
-				debugger;
 			}
 			// give the page time to settle
 			await workerSelf.activeWindow.happyDOM.whenAsyncComplete();
