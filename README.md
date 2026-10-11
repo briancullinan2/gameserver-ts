@@ -152,5 +152,15 @@ This platform merges two core server components into a zero-install cloud arcade
 * visual settings editor, visual folder and paths/github URL editor
 * requestIds/better parsing for controlling responses from proxy server
 * all gaming features still to implement
+* different names for all different workers that connect to socket server, separate bindings if they are serving data from another thread
+* dropping tabs between app environments, like a desktop popup when dragging a DockPanel tab, downloads the plugins from the other environment and opens it just the same
+* orchestration like opening many pages at onces, downloading PDFs, scanning for searchable content, etc
+* resume auto-filler widget
+* make resize collapsing sidebar join its parent tab in the tab heading, have 2 buttons in one heading and switch between sidebar and main
+* multiple browser renderers, PDF Print (Filtered), HTML Remote (Worker), IFrame (Insecure)
+* time machine like archive.org showing page changes over time and the last previous cached version if offline or missing
+* generate .har files from browser requests
+
+
 
 ![alt text](<Screenshot 2026-10-06 120734.png>) ![alt text](<Screenshot 2026-10-07 182604.png>)
