@@ -37,7 +37,7 @@ export class VirtualRendererManager
 	/**
 	 * Generates a standard RFC4122 v4 GUID
 	 */
-	private static generateGUID(): string
+	public static generateGUID(): string
 	{
 		if(typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
 		{

@@ -59,8 +59,9 @@ export class BrowserWidget extends Widget
 	private initialize?: Promise<void> | undefined;
 	private textLayer?: HTMLDivElement;
 	private rendering?: Promise<void>;
+	private START_URI = 'https://example.com';
 
-	constructor(title?: string)
+	constructor(title?: string, start?: string | Buffer)
 	{
 		super();
 		this.addClass('sc-widget-container');
@@ -68,6 +69,10 @@ export class BrowserWidget extends Widget
 		this.title.label = title ?? 'Mini Browser';
 		this.title.iconClass = 'bx bx-globe';
 		this.title.closable = true;
+		if(typeof start === 'string' && start.includes('://'))
+		{
+			this.START_URI = start;
+		}
 
 		this.buildLayout();
 		if(!widgetSelf.WebSocketMonitor)
@@ -103,7 +108,7 @@ export class BrowserWidget extends Widget
 		this.addrInput = document.createElement('input');
 		this.addrInput.type = 'text';
 		this.addrInput.value =
-			this.addrInput.placeholder = 'https://example.com';
+			this.addrInput.placeholder = this.START_URI;
 		this.addrInput.style.flex = '3';
 		this.addrInput.addEventListener('keydown', (e) =>
 		{
@@ -387,7 +392,9 @@ export class BrowserWidget extends Widget
 		// Render loading state in iframe
 		// this.showLoading(this.addrInput.value);
 
+		const requestId = widgetSelf.VirtualRendererManager.generateGUID();
 		const payload = JSON.stringify({
+			requestId,
 			method: 'GET',
 			url: url,
 			auth: (user || pass) ? { user, pass } : undefined
@@ -633,6 +640,7 @@ export class BrowserWidget extends Widget
 
 	protected override onBeforeHide(msg: Message): void
 	{
+		widgetSelf.WebSocketMonitor.serverResponse.disconnect(this.subResponse);
 		// this.mastersSidebar?.close();
 		super.onBeforeHide(msg);
 	}

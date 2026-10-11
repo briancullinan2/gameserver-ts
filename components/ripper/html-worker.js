@@ -149,7 +149,33 @@ function createVirtualDOM(html, url = 'https://virtual.local/', preferredEngine 
 
 			if(workerSelf.activeDocument)
 			{
-				workerSelf.activeDocument.write(html);
+				let processedHtml = html;
+
+				processedHtml = processedHtml.replace(/<link\b([^>]*\brel=["']stylesheet["'][^>]*)>/gi, (match, attrs) =>
+				{
+					const hrefMatch = attrs.match(/\bhref=["']([^"']+)["']/i);
+					const href = hrefMatch ? hrefMatch[1] : '';
+					return `<stylesheet src="${href}"></stylesheet>`;
+				});
+				processedHtml = processedHtml.replace(/<link\b([^>]*\bhref=["'][^"']+["'][^>]*\brel=["']stylesheet["'][^>]*)>/gi, (match, attrs) =>
+				{
+					const hrefMatch = attrs.match(/\bhref=["']([^"']+)["']/i);
+					const href = hrefMatch ? hrefMatch[1] : '';
+					return `<stylesheet src="${href}"></stylesheet>`;
+				});
+				processedHtml = processedHtml.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (match, attrs, content) =>
+				{
+					const srcMatch = attrs.match(/\bsrc=["']([^"']+)["']/i);
+					if(srcMatch)
+					{
+						return `<javascript src="${srcMatch[1]}"></javascript>`;
+					} else
+					{
+						return `<javascript>${content}</javascript>`;
+					}
+				});
+
+				workerSelf.activeDocument.write(processedHtml);
 			}
 
 			workerSelf.activeEngine = 'happy-dom';
@@ -304,6 +330,11 @@ workerSelf.onmessage = async (event) =>
 			if(workerSelf.activeDocument)
 			{
 				const elements = workerSelf.extractAndTagElements?.(workerSelf.activeDocument);
+				for(const el of /** @type {HTMLScriptElement[]} */(elements?.script ?? []))
+				{
+					await navigate(el.src);
+					// TODO: report browser files back to front end for network traffic monitor
+				}
 				debugger;
 			}
 			// give the page time to settle
@@ -500,3 +531,51 @@ async function handleIncomingHTTPResponse(fromAddr, data)
 
 }
 
+
+/**
+ *
+ * @param {string} address
+ * @returns
+ */
+function navigate(address)
+{
+	const url = address.trim();
+	if(!url) return;
+
+	//const user = this.userInput.value;
+	//const pass = this.passInput.value;
+
+	const requestId = generateGUID();
+	const payload = JSON.stringify({
+		method: 'GET',
+		url: url,
+		//	auth: (user || pass) ? { user, pass } : undefined
+	});
+
+	const parsed = new URL(url);
+
+	// Adapting sendQ3UDPMessage to route HTTP request through WebSocket middleware
+	if(typeof workerSelf.WebSocketMonitor?.sendHTTPRequest === 'function')
+	{
+		const parsedPort = parseInt(parsed.port);
+		workerSelf.WebSocketMonitor.sendHTTPRequest(parsed.hostname, !isNaN(parsedPort) ? parsedPort : (parsed.protocol.includes('https') ? 443 : 80), payload);
+	}
+}
+
+/**
+ * Generates a standard RFC4122 v4 GUID
+ * @returns {string}
+ */
+function generateGUID()
+{
+	if(typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+	{
+		return crypto.randomUUID();
+	}
+	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) =>
+	{
+		const r = (Math.random() * 16) | 0;
+		const v = c === 'x' ? r : (r & 0x3) | 0x8;
+		return v.toString(16);
+	});
+}
